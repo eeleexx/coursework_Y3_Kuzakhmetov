@@ -1,147 +1,171 @@
 # Multimodal Model for Causal Analysis of Information Flow on Stock Prices
 
-**HSE University — 3rd-Year Research Project (Kuzakhmetov I.R.)**
+HSE University, 3rd-Year Research Project, Kuzakhmetov I.R.
 
-A PyTorch-based pipeline implementing Disentangled Representation Learning (DRL) to separate fundamental market signals from "headline noise" in financial news.
+This repository contains a PyTorch-based research prototype for interpretable multimodal analysis of financial information flow and stock-price reactions. The project combines financial news, daily OHLCV data, FinBERT text embeddings, LSTM price encoders, disentangled shared/private representations, contrastive alignment, and reliability-aware gated fusion.
 
----
+The final empirical scope is intentionally conservative: the project is a daily equity/news event-study with an additional SPY 1-minute social information-flow extension. It does not claim to be a full high-frequency trading or order-book system.
 
 ## Architecture Overview
 
+```text
+FinBERT [CLS] -> TextEncoder -> DisentanglementModule
+                                    | shared text content
+                                    | private text noise
+                                    v
+OHLCV window  -> LSTM Encoder -> DisentanglementModule
+                                    | shared price content
+                                    | private price noise
+                                    v
+MoCo contrastive alignment between shared text and shared price
+                                    v
+Reliability-aware gated fusion -> next-return prediction
 ```
-FinBERT [CLS] ──► TextEncoder ──► DisentanglementModule
-                                        │ shared (content)
-                                        │ private (noise)
-                                        ▼
-OHLCV window  ──► TemporalEncoder ──► DisentanglementModule
-                   (2-layer LSTM)       │ shared (content)
-                                        │ private (noise)
-                                        ▼
-                MoCo contrastive loss (shared_text ↔ shared_price)
-                                        ▼
-                GatedFusionLayer ──► Prediction (next-day return)
-```
 
-### How It Implements the "Headline vs. Content" Hypothesis
-
-The key insight is the **Disentanglement Module**, which projects each modality's features into two orthogonal subspaces:
-
-| Subspace | Meaning | What it captures |
-|---|---|---|
-| **Shared** | Market-invariant | True economic *content* — signals correlated across both text and prices |
-| **Private** | Modality-specific | *Headline noise* (text) or microstructure noise (prices) |
-
-- An orthogonality loss (`diff_loss`) enforces that shared and private vectors are decorrelated.
-- **MoCo (Momentum Contrastive Learning)** pulls the shared representations of text and prices together, ensuring the shared subspace captures genuinely correlated market signals.
-- The **Gated Fusion Layer** estimates a confidence score for the textual modality. When the private (noise) component is large, the gate automatically down-weights text input.
-
-### Design Decisions
-
-| Decision | Rationale |
-|---|---|
-| **Frozen FinBERT** | The transformer is only used for embedding extraction at data-load time. Saves GPU memory; only the projection head is trained. |
-| **LSTM** (not TCN) | Simpler to implement and debug for PoC; sufficient for capturing temporal dependencies in 20-day windows. |
-| **MoCo queue = 256** | Balances diversity of negative samples with memory. Can be increased for larger datasets. |
-| **Cached embeddings** | FinBERT embeddings are saved to `.npy` files after first extraction, making subsequent runs instant. |
-
----
+The main modelling idea is to separate information that is shared across text and price dynamics from modality-specific noise. The shared subspace is treated as a proxy for content-like information, while the private subspace captures headline noise or price-only variation. A gated fusion layer then estimates how much the model should rely on text for a given event.
 
 ## Project Structure
 
-```
+```text
 coursework_Y3/
-├── data/                      # Raw CSV data
-│   ├── stock_data.csv         # OHLCV for 6 tickers (2019–2025)
-│   ├── AMD_news.csv           # News for each ticker
-│   ├── INTC_news.csv
-│   ├── ...
-├── data_loader.py             # Data parsing, FinBERT embeddings, Dataset
-├── model.py                   # Full model architecture
-├── train_prototype.py         # PoC training script
-├── experiments.py             # Baselines and ablation metrics
-├── latent_analysis.py         # Gate/content/noise diagnostics
-├── synthetic_experiment.py    # Controlled content-vs-noise simulation
-├── build_event_lens.py        # Static HTML interpretability demo
-├── spy_intraday_experiment.py # SPY 1-minute tweet/price model extension
-├── spy_event_study.py         # SPY intraday attention/reaction analysis
-├── requirements.txt           # Python dependencies
-├── results/                   # Generated plots
-│   └── loss_curve.png
-└── overview.md                # Research project overview
+├── README.md
+├── requirements.txt
+├── .gitignore
+├── data/
+│   ├── stock_data.csv
+│   ├── AMD_news.csv, INTC_news.csv, ...
+│   ├── *_finbert_embeddings.npy
+│   └── *_finbert_dates.npy
+├── figures/
+│   └── EDA figures used in the report
+├── results/
+│   ├── baseline and ablation outputs
+│   ├── latent diagnostics
+│   ├── EventLens HTML dashboards
+│   ├── synthetic validation outputs
+│   └── SPY intraday study outputs
+├── tex/
+│   ├── report_final.tex
+│   └── report_final.pdf
+├── data_loader.py
+├── model.py
+├── train_prototype.py
+├── experiments.py
+├── latent_analysis.py
+├── synthetic_experiment.py
+├── build_event_lens.py
+├── hypothesis_tests.py
+├── generate_eda_plots.py
+├── spy_intraday_experiment.py
+├── spy_event_study.py
+├── spy_response_curve.py
+└── spy_reaction_classifier.py
 ```
 
----
+The authoritative LaTeX source is `tex/report_final.tex`. There is intentionally no duplicate report source in the repository root.
 
-## Installation & Usage
+## Data Notes
+
+The lightweight daily equity/news data and cached FinBERT embeddings are intended to be committed with the repository. Two raw SPY tweet/intraday CSV files are intentionally ignored by `.gitignore` because they are too large for normal Git remotes:
+
+```text
+data/SPY_concat_files.csv
+data/spy_1min_tweet_price_dataset.csv
+```
+
+These files are required only for rerunning the SPY intraday extension. If they are not present, the daily equity/news experiments and report source still remain available.
+
+## Installation
 
 ```bash
-# 1. Create and activate virtual environment
 python3 -m venv venv
 source venv/bin/activate
-
-# 2. Install dependencies
 pip install -r requirements.txt
+```
 
-# 3. Run the proof-of-concept training
+## Main Experiments
+
+```bash
+# Prototype training for one ticker
 python train_prototype.py --ticker AMD --epochs 5
 
-# 4. Run baseline / ablation study
-python experiments.py --tickers AMD INTC --epochs 5
+# Baselines and ablations
+python experiments.py --epochs 5
 
-# 5. Export latent diagnostics for EventLens
+# Latent diagnostics and EventLens dashboards
 python latent_analysis.py --ticker AMD --epochs 5
 python build_event_lens.py --ticker AMD
 
-# 6. Run controlled synthetic validation
+# Controlled synthetic validation
 python synthetic_experiment.py --epochs 8
 
-# 7. SPY intraday social information-flow study
+# Statistical hypothesis-test summary
+python hypothesis_tests.py
+```
+
+## SPY Intraday Extension
+
+The SPY scripts require the ignored raw SPY CSV files listed above.
+
+```bash
 python spy_intraday_experiment.py --epochs 3 --max_samples 30000
 python spy_event_study.py
 python spy_response_curve.py
 python spy_reaction_classifier.py
-
-# Optional: customise parameters
-python train_prototype.py --ticker INTC --epochs 10 --lr 1e-3 --batch_size 64
 ```
 
-### Expected Output
+This extension is framed as a social information-flow and reaction-risk study. The main result is that tweet attention is associated with larger absolute 5-minute reactions and higher volume, while directional predictability remains weak.
 
-- Per-batch loss logging showing decreasing total loss
-- Epoch summary table with MSE, diff, and MoCo loss components
-- `results/loss_curve.png` — multi-panel plot of all loss components
-- `results/baseline_metrics.csv/.png` — price-only, text-only, static-fusion, and full-DRL comparison
-- `results/baseline_summary.csv` — aggregate metrics over all evaluated tickers
-- `results/latent_events_AMD.csv` — per-event text gate, content norm, noise norm, and predictions
-- `results/latent_proxy_summary.csv` — latent predictive proxy across tickers
-- `results/event_lens_<TICKER>.html` — static interpretability dashboard with price windows and text/no-text counterfactuals
-- `results/synthetic_metrics.csv/.png` — controlled validation where true content/noise factors are known
-- `results/spy_intraday_metrics.csv/.png` — SPY 1-minute tweet/price modelling study
-- `results/spy_event_study_summary.csv` and `results/spy_event_study_buckets.png` — intraday information-flow event study
-- `results/spy_response_curve.csv/.png` — matched lead-lag response after tweet-attention spikes
-- `results/spy_reaction_classifier.csv/.png` — top-decile 5-minute reaction classification
+## Report Compilation
 
----
+Compile the report from the repository root so that relative paths to `figures/` and `results/` resolve correctly:
 
-## Dependencies
+```bash
+latexmk -g -pdf -interaction=nonstopmode -halt-on-error -outdir=tex tex/report_final.tex
+```
 
-- Python 3.10+
-- PyTorch ≥ 2.0
-- HuggingFace Transformers ≥ 4.30
-- pandas, numpy, matplotlib, tqdm
+The compiled report is written to:
 
----
+```text
+tex/report_final.pdf
+```
 
-## Phases Covered
+## Expected Outputs
 
-- **Phase 1**: Dual-Stream Disentangled Encoder with MoCo contrastive regularisation ✅
-- **Phase 2**: Reliability-Aware Adaptive Fusion (Gated Fusion Layer) ✅
-- **Phase 3**: Interpretable validation via ablations, latent predictive proxy, synthetic ground-truth simulation, and EventLens dashboard ✅/ongoing
+Key generated outputs include:
 
-## Current Validation Snapshot
+```text
+results/baseline_metrics.csv
+results/baseline_summary.csv
+results/baseline_metrics.png
+results/latent_proxy_summary.csv
+results/event_lens_<TICKER>.html
+results/synthetic_metrics.csv
+results/synthetic_metrics.png
+results/hypothesis_tests.csv
+results/spy_event_study_summary.csv
+results/spy_event_study_buckets.png
+results/spy_response_curve.csv
+results/spy_response_curve.png
+results/spy_reaction_classifier.csv
+results/spy_reaction_classifier.png
+tex/report_final.pdf
+```
 
-- **Six-ticker baselines**: compares price-only LSTM, text-only FinBERT, static fusion, and full DRL across AMD, INTC, PFE, JNJ, BAC, and JPM.
-- **Aggregate performance**: full DRL has the best mean MSE/MAE and wins MSE on 4 of 6 tickers in the current run.
-- **Latent proxy**: learned content/noise/gate diagnostics are exported for every ticker; AMD and BAC show especially clear content-feature gains over an AR(1) return proxy.
-- **Controlled simulation**: predictions correlate strongly with true synthetic content and weakly with injected headline noise, supporting the content/noise separation hypothesis.
-- **SPY intraday social information-flow study**: 1-minute SPY OHLCV plus tweet sentiment shows that social attention is associated with absolute 5-minute reaction and trading volume. Tweet-only features also identify high-reaction regimes above the base rate, while directional predictability remains weak. This is framed as an intraday event-study and reaction-risk task, not a full HFT/order-book claim.
+## Validation Status
+
+Phase 1, the dual-stream disentangled encoder with MoCo-style contrastive regularisation, is implemented.
+
+Phase 2, reliability-aware adaptive fusion through a gated fusion layer, is implemented.
+
+Phase 3, interpretability and validation, is implemented through baseline comparisons, latent predictive proxies, controlled synthetic validation, hypothesis-test summaries, SPY intraday event studies, and EventLens dashboards.
+
+## Current Empirical Snapshot
+
+The six-ticker daily experiment compares price-only LSTM, text-only FinBERT, static fusion, and full DRL models across AMD, INTC, PFE, JNJ, BAC, and JPM. In the current run, the full DRL model has the best mean MSE and MAE and wins the MSE comparison on four out of six tickers. The report states the statistical limitations explicitly: the paired MSE improvement over static fusion is not significant at the 95% level.
+
+The synthetic validation supports the content/noise distinction under controlled ground-truth factors. The SPY intraday extension supports an attention/reaction-risk interpretation rather than a directional trading-alpha claim.
+
+## Repository
+
+https://github.com/eeleexx/coursework_Y3_Kuzakhmetov
