@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventLens · PFE</title>
+  <style>
+    :root {
+      --ink: #16211f;
+      --muted: #64706d;
+      --paper: #f7f1e5;
+      --card: #fffaf0;
+      --green: #2a9d8f;
+      --orange: #e76f51;
+      --blue: #264653;
+      --line: rgba(22, 33, 31, .14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(231, 111, 81, .18), transparent 28rem),
+        radial-gradient(circle at 84% 4%, rgba(42, 157, 143, .18), transparent 24rem),
+        linear-gradient(135deg, #fbf7ed, var(--paper));
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 48px 22px 72px; }
+    header { display: grid; grid-template-columns: 1.4fr .9fr; gap: 28px; align-items: end; }
+    h1 { font-size: clamp(48px, 8vw, 110px); line-height: .9; margin: 0; letter-spacing: -0.06em; }
+    h2 { font-size: 30px; margin: 48px 0 18px; }
+    h3 { font-size: 22px; margin: 8px 0 10px; line-height: 1.12; }
+    p { color: var(--muted); line-height: 1.55; }
+    .hero-note {
+      border-left: 5px solid var(--orange);
+      padding-left: 18px;
+      font-size: 18px;
+    }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 34px 0; }
+    .kpi, .event-card, .panel {
+      background: rgba(255, 250, 240, .78);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 45px rgba(38, 70, 83, .08);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .kpi b { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    .kpi strong { display: block; font-size: 30px; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .event-meta { color: var(--orange); text-transform: uppercase; font-size: 12px; letter-spacing: .12em; font-weight: 700; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .chips span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: white; font-size: 13px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 16px; }
+    .metric-grid div { border-top: 1px solid var(--line); padding-top: 8px; }
+    .metric-grid b { display: block; color: var(--muted); font-size: 12px; }
+    .metric-grid strong { font-size: 19px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    .bar { display: block; height: 10px; background: rgba(38, 70, 83, .12); border-radius: 999px; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.42); border-radius: 18px; overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .image-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    img { width: 100%; border-radius: 20px; border: 1px solid var(--line); background: white; }
+    .sparkline { margin: 12px 0 14px; padding: 10px; background: rgba(255,255,255,.52); border-radius: 16px; border: 1px solid var(--line); }
+    .sparkline svg { width: 100%; height: 92px; display: block; }
+    .sparkline polyline { fill: none; stroke: var(--blue); stroke-width: 2.3; vector-effect: non-scaling-stroke; }
+    .sparkline .event-line { stroke: var(--orange); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+    .sparkline small { color: var(--muted); display: block; margin-top: 6px; }
+    @media (max-width: 860px) {
+      header, .grid, .kpis, .image-row { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="event-meta">Multimodal causal model demo</div>
+      <h1>EventLens<br>PFE</h1>
+    </div>
+    <p class="hero-note">
+      Static dashboard for the Headline vs Content hypothesis. It shows where the model
+      treated news as market-relevant content and where it routed text into private noise.
+    </p>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><b>Validation events</b><strong>72</strong></div>
+    <div class="kpi"><b>Average text gate</b><strong>0.43</strong></div>
+    <div class="kpi"><b>Average noise ratio</b><strong>0.47</strong></div>
+    <div class="kpi"><b>Best MSE model</b><strong>full_drl</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline Comparison</h2>
+    <table>
+      <thead><tr><th>Model</th><th>MSE</th><th>MAE</th><th>Direction</th><th>IC</th></tr></thead>
+      <tbody><tr><td>price_only</td><td>0.009291</td><td>0.093983</td><td>0.444</td><td>-0.278</td></tr>
+<tr><td>text_only</td><td>0.001077</td><td>0.025970</td><td>0.500</td><td>-0.068</td></tr>
+<tr><td>static_fusion</td><td>0.002087</td><td>0.042365</td><td>0.444</td><td>+0.014</td></tr>
+<tr><td>full_drl</td><td>0.000409</td><td>0.015852</td><td>0.500</td><td>+0.024</td></tr></tbody>
+    </table>
+  </section>
+
+  <h2>Largest Market Reactions</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #1 · 2024-12-16</div>
+      <h3>Pfizer: Lowest Levels In A Decade Is An Opportunity With A Dividend Yield Exceeding 6.5%</h3>
+      <p>Pfizer&#x27;s shares have significantly underperformed, but the current valuation and high dividend yield present a compelling value play. Despite revenue declines and potential regulatory risks, Pfizer remains a cash-generating machine with strong liquidity and a robust drug pipeline. Pfizer&#x27;s operational improvements, debt reduction, and consistent di</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,48.51 4.76,57.98 9.52,70.00 14.29,52.88 19.05,51.79 23.81,38.31 28.57,57.62 33.33,70.00 38.10,64.90 42.86,57.25 47.62,69.27 52.38,26.29 57.14,45.96 61.90,50.33 66.67,28.84 71.43,16.09 76.19,15.00 80.95,21.56 85.71,19.37 90.48,26.66 95.24,22.65 100.00,19.74" />
+        </svg>
+        <small>2024-12-02 -&gt; 2025-01-02 · close 24.92 -> 25.69</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.69%</strong></div>
+        <div><b>Actual T+1</b><strong>+4.67%</strong></div>
+        <div><b>No text</b><strong>+6.14%</strong></div>
+        <div><b>Text only</b><strong>-6.78%</strong></div>
+      </div>
+      <label>Content share 53.4%</label>
+      <span class='bar'><span style='width:53.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.6%</label>
+      <span class='bar'><span style='width:46.6%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #2 · 2025-04-09</div>
+      <h3>Pfizer: Anticipating A Game-Changer Soon</h3>
+      <p>I reaffirm my Buy rating on Pfizer due to expected promising updates on danuglipron and strong capital efficiency metrics, despite the recent stock pullback. Pfizer&#x27;s management is expected to announce danuglipron updates soon, potentially boosting investor sentiment and stock performance. Pfizer&#x27;s cost reduction programs and revenue growth targets</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,16.91 4.76,19.84 9.52,16.91 14.29,15.00 19.05,26.73 23.81,24.39 28.57,30.40 33.33,49.76 38.10,54.75 42.86,66.33 47.62,56.80 52.38,70.00 57.14,65.31 61.90,62.23 66.67,57.53 71.43,63.40 76.19,61.93 80.95,63.40 85.71,56.21 90.48,58.27 95.24,52.55 100.00,50.49" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 24.74 -> 22.49</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.05%</strong></div>
+        <div><b>Actual T+1</b><strong>-4.00%</strong></div>
+        <div><b>No text</b><strong>+6.47%</strong></div>
+        <div><b>Text only</b><strong>-6.93%</strong></div>
+      </div>
+      <label>Content share 53.2%</label>
+      <span class='bar'><span style='width:53.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.8%</label>
+      <span class='bar'><span style='width:46.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #3 · 2025-04-09</div>
+      <h3>Pfizer: Best-In-Class Dividend Yield Together With Dirt Cheap Valuation</h3>
+      <p>Pfizer&#x27;s 7.5% dividend yield is safe due to revenue growth, cost efficiency, and a stronger balance sheet, making it a strong buy. Pfizer&#x27;s innovation in R&amp;D, including AI partnerships and new drug approvals, promises long-term market cap growth and a competitive edge. Defensive stocks like Pfizer are attractive amid market volatility, with the</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,16.91 4.76,19.84 9.52,16.91 14.29,15.00 19.05,26.73 23.81,24.39 28.57,30.40 33.33,49.76 38.10,54.75 42.86,66.33 47.62,56.80 52.38,70.00 57.14,65.31 61.90,62.23 66.67,57.53 71.43,63.40 76.19,61.93 80.95,63.40 85.71,56.21 90.48,58.27 95.24,52.55 100.00,50.49" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 24.74 -> 22.49</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.93%</strong></div>
+        <div><b>Actual T+1</b><strong>-4.00%</strong></div>
+        <div><b>No text</b><strong>+6.47%</strong></div>
+        <div><b>Text only</b><strong>-7.12%</strong></div>
+      </div>
+      <label>Content share 53.9%</label>
+      <span class='bar'><span style='width:53.9%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.1%</label>
+      <span class='bar'><span style='width:46.1%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #4 · 2024-10-08</div>
+      <h3>Pfizer: A 6% Yielding Ultra SWAN Bargain With Upside Potential</h3>
+      <p>Pfizer, yielding 5.6%, is an Ultra SWAN bargain with upside potential in the next year. Despite $70 billion in debt, Pfizer&#x27;s A- credit rating and stable cash flow ensure long-term stability and very strong dividend safety. Pfizer&#x27;s growth outlook includes a 5% long-term growth rate, with a 10% to 11% long-term return potential. While the risk prof</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,35.51 4.76,52.46 9.52,51.27 14.29,47.70 19.05,52.16 23.81,60.19 28.57,61.97 33.33,70.00 38.10,62.86 42.86,44.43 47.62,45.03 52.38,15.00 57.14,40.27 61.90,45.62 66.67,48.00 71.43,37.30 76.19,30.46 80.95,42.35 85.71,43.84 90.48,52.46 95.24,55.14 100.00,54.54" />
+        </svg>
+        <small>2024-09-24 -&gt; 2024-10-23 · close 28.04 -> 27.43</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.66%</strong></div>
+        <div><b>Actual T+1</b><strong>+3.46%</strong></div>
+        <div><b>No text</b><strong>+6.06%</strong></div>
+        <div><b>Text only</b><strong>-6.48%</strong></div>
+      </div>
+      <label>Content share 53.8%</label>
+      <span class='bar'><span style='width:53.8%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.2%</label>
+      <span class='bar'><span style='width:46.2%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #5 · 2024-10-08</div>
+      <h3>Pfizer: A Strong Product Pipeline Could Lead To Significant Upside</h3>
+      <p>Pfizer&#x27;s stock has likely bottomed and shows strong technical and fundamental indicators, including a &quot;&quot;Golden Cross&quot;&quot; and robust cost reduction plans. The company&#x27;s promising pipeline, including weight-loss treatments and AI-driven drug discovery, offers significant long-term upside potential. The Seagen acquisition enhances Pf</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,35.51 4.76,52.46 9.52,51.27 14.29,47.70 19.05,52.16 23.81,60.19 28.57,61.97 33.33,70.00 38.10,62.86 42.86,44.43 47.62,45.03 52.38,15.00 57.14,40.27 61.90,45.62 66.67,48.00 71.43,37.30 76.19,30.46 80.95,42.35 85.71,43.84 90.48,52.46 95.24,55.14 100.00,54.54" />
+        </svg>
+        <small>2024-09-24 -&gt; 2024-10-23 · close 28.04 -> 27.43</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.31%</strong></div>
+        <div><b>Actual T+1</b><strong>+3.46%</strong></div>
+        <div><b>No text</b><strong>+6.06%</strong></div>
+        <div><b>Text only</b><strong>-7.45%</strong></div>
+      </div>
+      <label>Content share 53.4%</label>
+      <span class='bar'><span style='width:53.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.6%</label>
+      <span class='bar'><span style='width:46.6%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #6 · 2025-03-31</div>
+      <h3>Pfizer: Looks Better Than Most, But I Can&#x27;t Eat Relative Returns</h3>
+      <p>Pfizer is operationally lagging behind other large companies, impacting its financial performance. Despite being cheaper than peers, there are valid reasons for Pfizer&#x27;s current stock price level. Pfizer isn&#x27;t a bad company, but it faces significant operational challenges. Investment in Pfizer should consider its relative valuation and underlying r</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,18.03 4.76,15.00 9.52,16.17 14.29,16.40 19.05,15.35 23.81,16.98 28.57,23.86 33.33,27.82 38.10,30.15 42.86,27.82 47.62,26.30 52.38,35.62 57.14,33.76 61.90,38.54 66.67,53.92 71.43,57.88 76.19,67.09 80.95,59.51 85.71,70.00 90.48,66.27 95.24,63.82 100.00,60.10" />
+        </svg>
+        <small>2025-03-17 -&gt; 2025-04-15 · close 25.56 -> 22.02</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.04%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.16%</strong></div>
+        <div><b>No text</b><strong>+5.93%</strong></div>
+        <div><b>Text only</b><strong>-6.52%</strong></div>
+      </div>
+      <label>Content share 53.5%</label>
+      <span class='bar'><span style='width:53.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.5%</label>
+      <span class='bar'><span style='width:46.5%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Content-Like Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">content #1 · 2025-05-14</div>
+      <h3>Pfizer: Bearish Catalysts Brewing</h3>
+      <p>Pfizer&#x27;s 7.45% forward dividend yield is misleading, as the share price decline outpaces the payout. Weak dividend growth, stagnant EPS projections, and a looming patent cliff are significant bearish catalysts for Pfizer. Regulatory hurdles and bearish technical indicators further reinforce the negative outlook for Pfizer&#x27;s stock. Despite some bull</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="62.50" y1="6" x2="62.50" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 6.25,28.40 12.50,20.86 18.75,30.08 25.00,57.72 31.25,60.23 37.50,55.20 43.75,62.60 50.00,39.56 56.25,45.82 62.50,70.00 68.75,53.50 75.00,46.95 81.25,42.12 87.50,27.32 93.75,40.98 100.00,40.98" />
+        </svg>
+        <small>2025-04-30 -&gt; 2025-05-22 · close 23.95 -> 23.04</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.57%</strong></div>
+        <div><b>Actual T+1</b><strong>+2.63%</strong></div>
+        <div><b>No text</b><strong>+6.31%</strong></div>
+        <div><b>Text only</b><strong>-9.70%</strong></div>
+      </div>
+      <label>Content share 53.0%</label>
+      <span class='bar'><span style='width:53.0%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.0%</label>
+      <span class='bar'><span style='width:47.0%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #2 · 2025-02-12</div>
+      <h3>Pfizer: 3 Key Risks That Warrant A Sell</h3>
+      <p>Pfizer&#x27;s business is facing material revenue shrink issues due to many patent expirations over the next 3 years. Quarterly revenue run rate analysis suggests management may be underestimating the impact. PFE continues to have recurring &#x27;unusual charges.&#x27; Accounting for this, its EBIT margins are in barely profitable territory. The Company is t</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,26.08 4.76,15.00 9.52,29.90 14.29,42.12 19.05,54.72 23.81,32.95 28.57,56.25 33.33,59.69 38.10,54.72 42.86,67.71 47.62,70.00 52.38,63.51 57.14,67.71 61.90,66.56 66.67,53.96 71.43,53.58 76.19,38.30 80.95,24.93 85.71,21.49 90.48,33.72 95.24,45.94 100.00,33.33" />
+        </svg>
+        <small>2025-01-29 -&gt; 2025-02-28 · close 26.12 -> 25.94</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.05%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.67%</strong></div>
+        <div><b>No text</b><strong>+6.12%</strong></div>
+        <div><b>Text only</b><strong>-9.71%</strong></div>
+      </div>
+      <label>Content share 53.4%</label>
+      <span class='bar'><span style='width:53.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.6%</label>
+      <span class='bar'><span style='width:46.6%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #3 · 2025-04-23</div>
+      <h3>Pfizer Earnings Preview: Pharma May Plumb New Depths After Obesity Drug Debacle</h3>
+      <p>Pfizer Inc.&#x27;s stock has performed poorly despite massive COVID-19 earnings, trading at a 12-year low due to flawed M&amp;A deals and high debt levels. The discontinuation of danuglipron, a potential obesity drug, highlights Pfizer&#x27;s struggle to develop successful new drugs, impacting its market position. Pfizer faces significant challenges includin</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,65.12 4.76,52.45 9.52,70.00 14.29,63.76 19.05,59.66 23.81,53.42 28.57,61.22 33.33,59.27 38.10,61.22 42.86,51.67 47.62,54.40 52.38,46.79 57.14,44.06 61.90,41.52 66.67,27.09 71.43,15.00 76.19,24.36 80.95,19.10 85.71,25.53 90.48,44.84 95.24,46.60 100.00,43.09" />
+        </svg>
+        <small>2025-04-08 -&gt; 2025-05-08 · close 21.43 -> 22.54</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.57%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.74%</strong></div>
+        <div><b>No text</b><strong>+6.27%</strong></div>
+        <div><b>Text only</b><strong>-9.05%</strong></div>
+      </div>
+      <label>Content share 53.2%</label>
+      <span class='bar'><span style='width:53.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.8%</label>
+      <span class='bar'><span style='width:46.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #4 · 2024-10-09</div>
+      <h3>Pfizer: Investor Activism Is Not The Solution</h3>
+      <p>The story of activist fund Starboard Value taking a $1 billion position in Pfizer is grabbing headlines the last few days. However, no good new solutions are being offered, at least according to the stories and articles that have surfaced since the stake was first mentioned. Additional cost cutting, more share repurchases, or management and board changes are</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,52.46 4.76,51.27 9.52,47.70 14.29,52.16 19.05,60.19 23.81,61.97 28.57,70.00 33.33,62.86 38.10,44.43 42.86,45.03 47.62,15.00 52.38,40.27 57.14,45.62 61.90,48.00 66.67,37.30 71.43,30.46 76.19,42.35 80.95,43.84 85.71,52.46 90.48,55.14 95.24,54.54 100.00,61.08" />
+        </svg>
+        <small>2024-09-25 -&gt; 2024-10-24 · close 27.50 -> 27.22</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.12%</strong></div>
+        <div><b>Actual T+1</b><strong>-2.82%</strong></div>
+        <div><b>No text</b><strong>+6.05%</strong></div>
+        <div><b>Text only</b><strong>-7.79%</strong></div>
+      </div>
+      <label>Content share 53.0%</label>
+      <span class='bar'><span style='width:53.0%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.0%</label>
+      <span class='bar'><span style='width:47.0%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Noise-Heavy Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">noise #1 · 2024-07-29</div>
+      <h3>Pfizer And Merck&#x27;s Earnings Previews: Uncorrelated To Big Tech, And Growth Styles</h3>
+      <p>Both Merck and Pfizer are expected to report their Q2 ’24 financial results on Tuesday morning, July 30 ’24, before the opening bell. It’s time for Pfizer to make hay after the pandemic spike, when the stock jumped from $30 in 2020 to $60 in late ’21. Today, Merck is really all about Keytruda and what the pharma giant can squeeze from it, as it awaits furthe</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,65.42 4.76,58.04 9.52,48.26 14.29,54.16 19.05,49.37 23.81,56.19 28.57,58.04 33.33,49.18 38.10,45.49 42.86,26.60 47.62,27.53 52.38,15.00 57.14,30.90 61.90,28.84 66.67,32.96 71.43,45.87 76.19,53.72 80.95,62.52 85.71,64.20 90.48,68.13 95.24,70.00 100.00,62.52" />
+        </svg>
+        <small>2024-07-15 -&gt; 2024-08-13 · close 27.28 -> 27.42</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.90%</strong></div>
+        <div><b>Actual T+1</b><strong>+2.18%</strong></div>
+        <div><b>No text</b><strong>+6.01%</strong></div>
+        <div><b>Text only</b><strong>-4.91%</strong></div>
+      </div>
+      <label>Content share 50.9%</label>
+      <span class='bar'><span style='width:50.9%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.1%</label>
+      <span class='bar'><span style='width:49.1%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #2 · 2025-02-24</div>
+      <h3>Pfizer: What The Summit Therapeutics Deal Brings</h3>
+      <p>Pfizer and Summit Therapeutics announced a clinical trial collaboration that involves Pfizer&#x27;s ADC pipeline and Summit&#x27;s ivonescimab. Pfizer will conduct combination trials of its vedotin-based ADCs with ivonescimab, and both companies will oversee the trials. Both companies keep the rights to their respective products, and Pfizer&#x27;s risk is li</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,58.31 4.76,52.68 9.52,67.40 14.29,70.00 19.05,62.64 23.81,67.40 28.57,66.10 33.33,51.81 38.10,51.38 42.86,34.06 47.62,18.90 52.38,15.00 57.14,28.86 61.90,42.72 66.67,28.43 71.43,36.22 76.19,57.87 80.95,49.65 85.71,36.65 90.48,15.43 95.24,19.33 100.00,47.48" />
+        </svg>
+        <small>2025-02-07 -&gt; 2025-03-11 · close 25.26 -> 25.50</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.51%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.34%</strong></div>
+        <div><b>No text</b><strong>+6.16%</strong></div>
+        <div><b>Text only</b><strong>-5.25%</strong></div>
+      </div>
+      <label>Content share 51.6%</label>
+      <span class='bar'><span style='width:51.6%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.4%</label>
+      <span class='bar'><span style='width:48.4%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #3 · 2025-05-20</div>
+      <h3>Pfizer Thinks Bigger With 3SBio Deal</h3>
+      <p>Pfizer Inc. decided to think bigger after the Summit deal in February, and that it needs control of a PD-1/VEGF bispecific antibody versus participating with its ADC pipeline. The 3SBio deal allows increased control of its oncology pipeline and much higher financial rewards in the long run, and comes at a relatively low cost. The jury is still out on the PD-</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.44</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="83.33" y1="6" x2="83.33" y2="74" class="event-line" />
+          <polyline points="0.00,54.17 8.33,57.41 16.67,50.93 25.00,60.47 33.33,30.77 41.67,38.83 50.00,70.00 58.33,48.73 66.67,40.30 75.00,34.07 83.33,15.00 91.67,32.60 100.00,32.60" />
+        </svg>
+        <small>2025-05-06 -&gt; 2025-05-22 · close 22.45 -> 23.04</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.63%</strong></div>
+        <div><b>Actual T+1</b><strong>-2.04%</strong></div>
+        <div><b>No text</b><strong>+6.24%</strong></div>
+        <div><b>Text only</b><strong>-7.73%</strong></div>
+      </div>
+      <label>Content share 52.1%</label>
+      <span class='bar'><span style='width:52.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.9%</label>
+      <span class='bar'><span style='width:47.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #4 · 2024-09-23</div>
+      <h3>Pfizer: Undervalued Healthcare Leader Poised For Further Recovery</h3>
+      <p>Pfizer&#x27;s transition from COVID revenue faces skepticism, as PFE underperformed its healthcare peers recently. Successful integration of Seagen is crucial for Pfizer&#x27;s oncology portfolio, potentially lifting investor sentiment. Pfizer&#x27;s cautious approach to weight loss drugs suggests success is far from certain, raising its execution risks to d</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.42</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,35.98 4.76,25.49 9.52,28.03 14.29,43.93 19.05,40.43 23.81,15.00 28.57,22.63 33.33,25.17 38.10,28.03 42.86,35.66 47.62,39.16 52.38,33.12 57.14,51.24 61.90,49.97 66.67,46.16 71.43,50.92 76.19,59.51 80.95,61.42 85.71,70.00 90.48,62.37 95.24,42.66 100.00,43.29" />
+        </svg>
+        <small>2024-09-09 -&gt; 2024-10-08 · close 27.96 -> 27.74</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.52%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.65%</strong></div>
+        <div><b>No text</b><strong>+6.04%</strong></div>
+        <div><b>Text only</b><strong>-8.40%</strong></div>
+      </div>
+      <label>Content share 52.5%</label>
+      <span class='bar'><span style='width:52.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.5%</label>
+      <span class='bar'><span style='width:47.5%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Diagnostics</h2>
+  <section class="image-row">
+    <img src="gate_timeline_PFE.png" alt="Gate timeline">
+    <img src="content_noise_scatter_PFE.png" alt="Content noise scatter">
+  </section>
+</main>
+</body>
+</html>

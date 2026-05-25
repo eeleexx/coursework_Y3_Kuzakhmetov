@@ -1,0 +1,7 @@
+hypothesis,test,effect,ci_95,p_value,decision
+H1,Synthetic Pearson correlations,r_shared_content=0.517; r_private_noise=0.289,n/a,<0.001,H0 rejected
+H2,Paired one-sided t-test over ticker MSE,mean MSE reduction=0.000759,"[-0.000899, 0.002417]",0.146,H0 cannot be rejected
+H3,One-sided t-test over content Delta R2,mean Delta R2=0.0119,"[-0.0030, 0.0267]",0.048,H0 rejected
+H4,One-sided t-test over ticker-level monthly correlations,mean Pearson r=0.160,"[0.032, 0.288]",0.012,H0 rejected
+H5,Spearman correlation on 1-minute SPY bars,rho=0.303,n/a,<0.001,H0 rejected
+H6,Mann-Whitney test for tweet-only reaction classifier,ROC AUC=0.722,n/a,<0.001,H0 rejected

@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventLens · JPM</title>
+  <style>
+    :root {
+      --ink: #16211f;
+      --muted: #64706d;
+      --paper: #f7f1e5;
+      --card: #fffaf0;
+      --green: #2a9d8f;
+      --orange: #e76f51;
+      --blue: #264653;
+      --line: rgba(22, 33, 31, .14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(231, 111, 81, .18), transparent 28rem),
+        radial-gradient(circle at 84% 4%, rgba(42, 157, 143, .18), transparent 24rem),
+        linear-gradient(135deg, #fbf7ed, var(--paper));
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 48px 22px 72px; }
+    header { display: grid; grid-template-columns: 1.4fr .9fr; gap: 28px; align-items: end; }
+    h1 { font-size: clamp(48px, 8vw, 110px); line-height: .9; margin: 0; letter-spacing: -0.06em; }
+    h2 { font-size: 30px; margin: 48px 0 18px; }
+    h3 { font-size: 22px; margin: 8px 0 10px; line-height: 1.12; }
+    p { color: var(--muted); line-height: 1.55; }
+    .hero-note {
+      border-left: 5px solid var(--orange);
+      padding-left: 18px;
+      font-size: 18px;
+    }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 34px 0; }
+    .kpi, .event-card, .panel {
+      background: rgba(255, 250, 240, .78);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 45px rgba(38, 70, 83, .08);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .kpi b { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    .kpi strong { display: block; font-size: 30px; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .event-meta { color: var(--orange); text-transform: uppercase; font-size: 12px; letter-spacing: .12em; font-weight: 700; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .chips span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: white; font-size: 13px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 16px; }
+    .metric-grid div { border-top: 1px solid var(--line); padding-top: 8px; }
+    .metric-grid b { display: block; color: var(--muted); font-size: 12px; }
+    .metric-grid strong { font-size: 19px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    .bar { display: block; height: 10px; background: rgba(38, 70, 83, .12); border-radius: 999px; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.42); border-radius: 18px; overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .image-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    img { width: 100%; border-radius: 20px; border: 1px solid var(--line); background: white; }
+    .sparkline { margin: 12px 0 14px; padding: 10px; background: rgba(255,255,255,.52); border-radius: 16px; border: 1px solid var(--line); }
+    .sparkline svg { width: 100%; height: 92px; display: block; }
+    .sparkline polyline { fill: none; stroke: var(--blue); stroke-width: 2.3; vector-effect: non-scaling-stroke; }
+    .sparkline .event-line { stroke: var(--orange); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+    .sparkline small { color: var(--muted); display: block; margin-top: 6px; }
+    @media (max-width: 860px) {
+      header, .grid, .kpis, .image-row { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="event-meta">Multimodal causal model demo</div>
+      <h1>EventLens<br>JPM</h1>
+    </div>
+    <p class="hero-note">
+      Static dashboard for the Headline vs Content hypothesis. It shows where the model
+      treated news as market-relevant content and where it routed text into private noise.
+    </p>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><b>Validation events</b><strong>59</strong></div>
+    <div class="kpi"><b>Average text gate</b><strong>0.46</strong></div>
+    <div class="kpi"><b>Average noise ratio</b><strong>0.46</strong></div>
+    <div class="kpi"><b>Best MSE model</b><strong>static_fusion</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline Comparison</h2>
+    <table>
+      <thead><tr><th>Model</th><th>MSE</th><th>MAE</th><th>Direction</th><th>IC</th></tr></thead>
+      <tbody><tr><td>price_only</td><td>0.000549</td><td>0.017352</td><td>0.593</td><td>+0.091</td></tr>
+<tr><td>text_only</td><td>0.009954</td><td>0.089260</td><td>0.542</td><td>+0.255</td></tr>
+<tr><td>static_fusion</td><td>0.000477</td><td>0.015377</td><td>0.458</td><td>+0.081</td></tr>
+<tr><td>full_drl</td><td>0.001859</td><td>0.039504</td><td>0.542</td><td>-0.192</td></tr></tbody>
+    </table>
+  </section>
+
+  <h2>Largest Market Reactions</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #1 · 2025-04-08</div>
+      <h3>JPMorgan Q1 Preview: Numerous Inflection Points Could Materialize</h3>
+      <p>JPMorgan Chase &amp; Co. is set to report its Q1 results on Friday the 11th. According to sampled data, the street estimates $44.05 billion in revenue and $4.64 GAAP EPS. A look-back analysis suggests that JPMorgan&#x27;s NII margins likely remained high during Q1. However, growing macro and credit tensions might shift provisions upward. Global deal-making h</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,15.14 9.52,19.19 14.29,26.51 19.05,23.11 23.81,25.39 28.57,22.38 33.33,46.20 38.10,70.00 42.86,64.18 47.62,60.78 52.38,36.34 57.14,46.45 61.90,33.74 66.67,35.81 71.43,38.03 76.19,42.96 80.95,39.67 85.71,43.82 90.48,34.59 95.24,27.19 100.00,21.93" />
+        </svg>
+        <small>2025-03-25 -&gt; 2025-04-24 · close 249.59 -> 244.64</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.63%</strong></div>
+        <div><b>Actual T+1</b><strong>+8.06%</strong></div>
+        <div><b>No text</b><strong>+7.21%</strong></div>
+        <div><b>Text only</b><strong>-7.91%</strong></div>
+      </div>
+      <label>Content share 50.7%</label>
+      <span class='bar'><span style='width:50.7%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.3%</label>
+      <span class='bar'><span style='width:49.3%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #2 · 2025-04-03</div>
+      <h3>JPMorgan Chase: Tariffs Loom Over This Top Bank Ahead Of Q1 Earnings</h3>
+      <p>JPMorgan is highly efficient with a 17.4% ROE, outperforming peers like Bank of America, Goldman Sachs, and Morgan Stanley. The bank&#x27;s diversified structure across Consumer Banking, Commercial &amp; Investment Banking, and Asset Management contributes to its strong market position and operational advances. Despite solid performance, JPM&#x27;s current v</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.44</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,31.85 4.76,28.21 9.52,19.27 14.29,15.00 19.05,15.14 23.81,19.19 28.57,26.51 33.33,23.11 38.10,25.39 42.86,22.38 47.62,46.20 52.38,70.00 57.14,64.18 61.90,60.78 66.67,36.34 71.43,46.45 76.19,33.74 80.95,35.81 85.71,38.03 90.48,42.96 95.24,39.67 100.00,43.82" />
+        </svg>
+        <small>2025-03-20 -&gt; 2025-04-21 · close 237.55 -> 228.99</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.22%</strong></div>
+        <div><b>Actual T+1</b><strong>-7.48%</strong></div>
+        <div><b>No text</b><strong>+6.85%</strong></div>
+        <div><b>Text only</b><strong>-2.44%</strong></div>
+      </div>
+      <label>Content share 54.2%</label>
+      <span class='bar'><span style='width:54.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.8%</label>
+      <span class='bar'><span style='width:45.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #3 · 2024-12-17</div>
+      <h3>JPMorgan Chase: Well-Positioned For The Point In The Cycle</h3>
+      <p>JPMorgan Chase has shown strong financial performance with significant revenue and earnings growth, despite higher credit costs and cautious economic outlooks. The bank&#x27;s strategic investments in technology and AI, along with expansion plans, indicate robust future growth potential. JPMorgan Chase maintains a strong balance sheet with low loan-to-deposi</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,23.22 4.76,27.82 9.52,21.09 14.29,15.00 19.05,26.49 23.81,29.57 28.57,27.40 33.33,33.87 38.10,39.02 42.86,40.19 47.62,44.13 52.38,70.00 57.14,61.62 61.90,46.59 66.67,44.04 71.43,31.35 76.19,28.66 80.95,35.04 85.71,41.03 90.48,39.76 95.24,38.83 100.00,28.21" />
+        </svg>
+        <small>2024-12-03 -&gt; 2025-01-03 · close 242.07 -> 240.55</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.60%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.35%</strong></div>
+        <div><b>No text</b><strong>+6.96%</strong></div>
+        <div><b>Text only</b><strong>-2.92%</strong></div>
+      </div>
+      <label>Content share 54.5%</label>
+      <span class='bar'><span style='width:54.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.5%</label>
+      <span class='bar'><span style='width:45.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #4 · 2024-07-17</div>
+      <h3>JPMorgan And Citigroup Earnings Summaries: Like Both, But Citigroup Is A Cheaper, Longer-Term Play</h3>
+      <p>JPM is “winning” for its shareholders, while Jane Fraser continues to turn around Citigroup. Coming into last Friday morning’s call, our revenue estimate for JPM was $42 billion and change, but that estimate was actually revised up on Thursday. Citi’s net revenue grew 3% YoY, while EPS grew 14% YoY, with an 8% EPS upside surprise.</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,56.85 4.76,57.48 9.52,70.00 14.29,68.27 19.05,57.07 23.81,56.30 28.57,57.89 33.33,69.32 38.10,46.05 42.86,29.80 47.62,15.00 52.38,46.37 57.14,47.28 61.90,45.00 66.67,44.78 71.43,52.70 76.19,52.33 80.95,36.08 85.71,42.41 90.48,22.65 95.24,33.53 100.00,55.57" />
+        </svg>
+        <small>2024-07-02 -&gt; 2024-08-01 · close 204.10 -> 204.37</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.01%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.18%</strong></div>
+        <div><b>No text</b><strong>+7.56%</strong></div>
+        <div><b>Text only</b><strong>-5.18%</strong></div>
+      </div>
+      <label>Content share 52.7%</label>
+      <span class='bar'><span style='width:52.7%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.3%</label>
+      <span class='bar'><span style='width:47.3%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #5 · 2025-04-09</div>
+      <h3>JPMorgan Earnings Preview: Tough Compares Meet Harder Capital Markets</h3>
+      <p>JPMorgan will report their Q1 ’25 financial results before the opening bell on Friday, April 11th, 2025. Consensus estimates for the bank giant are expecting $4.61 in earnings per share on $44.1 billion in revenue for expected y-o-y growth in EPS of exactly 0% (flat y-o-y) on -1% revenue growth. With the drop in JPM’s stock price from $280 late in ’24 to $23</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,19.06 9.52,26.40 14.29,22.99 19.05,25.27 23.81,22.26 28.57,46.14 33.33,70.00 38.10,64.17 42.86,60.76 47.62,36.25 52.38,46.39 57.14,33.64 61.90,35.72 66.67,37.95 71.43,42.89 76.19,39.59 80.95,43.76 85.71,34.50 90.48,27.08 95.24,21.81 100.00,23.34" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 249.49 -> 243.55</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.36%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.09%</strong></div>
+        <div><b>No text</b><strong>+7.26%</strong></div>
+        <div><b>Text only</b><strong>-2.11%</strong></div>
+      </div>
+      <label>Content share 51.5%</label>
+      <span class='bar'><span style='width:51.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.5%</label>
+      <span class='bar'><span style='width:48.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #6 · 2025-04-09</div>
+      <h3>JPMorgan Chase: Possible Stagflation Would Crush Valuation</h3>
+      <p>JPMorgan Chase has dipped 24% from its 52-week high on market tariff concerns. A US recession is now the base case for 2025 as CPI and core PCE could be set for a sustained rise on a ramping tariff regime. There could be a further retrenchment on JPM&#x27;s valuation in the short term and a decline in financial performance in the medium term.</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,19.06 9.52,26.40 14.29,22.99 19.05,25.27 23.81,22.26 28.57,46.14 33.33,70.00 38.10,64.17 42.86,60.76 47.62,36.25 52.38,46.39 57.14,33.64 61.90,35.72 66.67,37.95 71.43,42.89 76.19,39.59 80.95,43.76 85.71,34.50 90.48,27.08 95.24,21.81 100.00,23.34" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 249.49 -> 243.55</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.81%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.09%</strong></div>
+        <div><b>No text</b><strong>+7.26%</strong></div>
+        <div><b>Text only</b><strong>-3.06%</strong></div>
+      </div>
+      <label>Content share 51.8%</label>
+      <span class='bar'><span style='width:51.8%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.2%</label>
+      <span class='bar'><span style='width:48.2%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Content-Like Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">content #1 · 2025-03-10</div>
+      <h3>JPMorgan Chase: Increasingly Hostile Environment</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,19.61 4.76,25.11 9.52,23.17 14.29,22.81 19.05,15.00 23.81,20.62 28.57,35.07 33.33,33.29 38.10,40.24 42.86,46.18 47.62,60.20 52.38,64.49 57.14,66.22 61.90,70.00 66.67,59.89 71.43,57.82 76.19,56.37 80.95,50.60 85.71,50.74 90.48,47.09 95.24,38.12 100.00,33.84" />
+        </svg>
+        <small>2025-02-24 -&gt; 2025-03-25 · close 259.74 -> 249.59</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.21%</strong></div>
+        <div><b>Actual T+1</b><strong>-1.33%</strong></div>
+        <div><b>No text</b><strong>+6.82%</strong></div>
+        <div><b>Text only</b><strong>-3.36%</strong></div>
+      </div>
+      <label>Content share 54.0%</label>
+      <span class='bar'><span style='width:54.0%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.0%</label>
+      <span class='bar'><span style='width:46.0%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #2 · 2024-06-27</div>
+      <h3>JPMorgan: Still Not A Buy After Bank Stress Tests</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,64.05 9.52,63.71 14.29,60.36 19.05,54.72 23.81,50.05 28.57,56.67 33.33,49.46 38.10,51.73 42.86,53.51 47.62,48.65 52.38,40.02 57.14,31.11 61.90,21.66 66.67,22.05 71.43,29.78 76.19,28.71 80.95,21.80 85.71,21.32 90.48,22.31 95.24,29.36 100.00,15.00" />
+        </svg>
+        <small>2024-06-12 -&gt; 2024-07-15 · close 187.19 -> 206.43</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.61%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.55%</strong></div>
+        <div><b>No text</b><strong>+7.68%</strong></div>
+        <div><b>Text only</b><strong>-0.32%</strong></div>
+      </div>
+      <label>Content share 54.7%</label>
+      <span class='bar'><span style='width:54.7%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.3%</label>
+      <span class='bar'><span style='width:45.3%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #3 · 2024-07-15</div>
+      <h3>JPMorgan Chase: Likely Fairly Valued, But Well-Positioned To Keep Gaining Market Share</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,58.90 9.52,47.15 14.29,47.63 19.05,57.25 23.81,55.92 28.57,47.32 33.33,46.72 38.10,47.95 42.86,56.73 47.62,38.85 52.38,26.37 57.14,15.00 61.90,39.10 66.67,39.80 71.43,38.05 76.19,37.88 80.95,43.96 85.71,43.68 90.48,31.19 95.24,36.06 100.00,20.88" />
+        </svg>
+        <small>2024-06-28 -&gt; 2024-07-30 · close 197.68 -> 211.48</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.46%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.70%</strong></div>
+        <div><b>No text</b><strong>+7.62%</strong></div>
+        <div><b>Text only</b><strong>-1.20%</strong></div>
+      </div>
+      <label>Content share 54.6%</label>
+      <span class='bar'><span style='width:54.6%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.4%</label>
+      <span class='bar'><span style='width:45.4%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #4 · 2024-12-20</div>
+      <h3>JPMorgan Chase: The Bull Vs. Bear Debate Heading Into 2025</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,26.49 9.52,29.57 14.29,27.40 19.05,33.87 23.81,39.02 28.57,40.19 33.33,44.13 38.10,70.00 42.86,61.62 47.62,46.59 52.38,44.04 57.14,31.35 61.90,28.66 66.67,35.04 71.43,41.03 76.19,39.76 80.95,38.83 85.71,28.21 90.48,32.05 95.24,24.50 100.00,24.63" />
+        </svg>
+        <small>2024-12-06 -&gt; 2025-01-08 · close 244.58 -> 241.64</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.99%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.33%</strong></div>
+        <div><b>No text</b><strong>+7.07%</strong></div>
+        <div><b>Text only</b><strong>-3.23%</strong></div>
+      </div>
+      <label>Content share 53.4%</label>
+      <span class='bar'><span style='width:53.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.6%</label>
+      <span class='bar'><span style='width:46.6%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Noise-Heavy Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">noise #1 · 2025-04-08</div>
+      <h3>JPMorgan Q1 Preview: Numerous Inflection Points Could Materialize</h3>
+      <p>JPMorgan Chase &amp; Co. is set to report its Q1 results on Friday the 11th. According to sampled data, the street estimates $44.05 billion in revenue and $4.64 GAAP EPS. A look-back analysis suggests that JPMorgan&#x27;s NII margins likely remained high during Q1. However, growing macro and credit tensions might shift provisions upward. Global deal-making h</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,15.14 9.52,19.19 14.29,26.51 19.05,23.11 23.81,25.39 28.57,22.38 33.33,46.20 38.10,70.00 42.86,64.18 47.62,60.78 52.38,36.34 57.14,46.45 61.90,33.74 66.67,35.81 71.43,38.03 76.19,42.96 80.95,39.67 85.71,43.82 90.48,34.59 95.24,27.19 100.00,21.93" />
+        </svg>
+        <small>2025-03-25 -&gt; 2025-04-24 · close 249.59 -> 244.64</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.63%</strong></div>
+        <div><b>Actual T+1</b><strong>+8.06%</strong></div>
+        <div><b>No text</b><strong>+7.21%</strong></div>
+        <div><b>Text only</b><strong>-7.91%</strong></div>
+      </div>
+      <label>Content share 50.7%</label>
+      <span class='bar'><span style='width:50.7%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.3%</label>
+      <span class='bar'><span style='width:49.3%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #2 · 2024-07-10</div>
+      <h3>JPMorgan And Citigroup Q2 &#x27;24 Earnings Previews: Both Should Have Decent Quarters With Different Catalysts</h3>
+      <p>JPM is scheduled to release their Q2 ’24 financial results before the opening bell, Friday, July 12th, 2024, with Street consensus expecting $4.18 in earnings per share. JPM has a tough compare with Q2 ’23 when revenue and EPS grew 34% and 54%, respectively. JPM also has tougher a compare vs. ’23 in Q3 ’24. Citigroup’s constant allure over the past 5 years h</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,68.29 4.76,70.00 9.52,65.36 14.29,57.13 19.05,48.63 23.81,39.62 28.57,40.00 33.33,47.37 38.10,46.35 42.86,39.76 47.62,39.30 52.38,40.24 57.14,46.96 61.90,33.27 66.67,23.71 71.43,15.00 76.19,33.46 80.95,34.00 85.71,32.66 90.48,32.52 95.24,37.18 100.00,36.97" />
+        </svg>
+        <small>2024-06-25 -&gt; 2024-07-25 · close 193.58 -> 205.07</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.73%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.17%</strong></div>
+        <div><b>No text</b><strong>+7.61%</strong></div>
+        <div><b>Text only</b><strong>-4.18%</strong></div>
+      </div>
+      <label>Content share 51.1%</label>
+      <span class='bar'><span style='width:51.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.9%</label>
+      <span class='bar'><span style='width:48.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #3 · 2025-04-09</div>
+      <h3>JPMorgan Earnings Preview: Tough Compares Meet Harder Capital Markets</h3>
+      <p>JPMorgan will report their Q1 ’25 financial results before the opening bell on Friday, April 11th, 2025. Consensus estimates for the bank giant are expecting $4.61 in earnings per share on $44.1 billion in revenue for expected y-o-y growth in EPS of exactly 0% (flat y-o-y) on -1% revenue growth. With the drop in JPM’s stock price from $280 late in ’24 to $23</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,19.06 9.52,26.40 14.29,22.99 19.05,25.27 23.81,22.26 28.57,46.14 33.33,70.00 38.10,64.17 42.86,60.76 47.62,36.25 52.38,46.39 57.14,33.64 61.90,35.72 66.67,37.95 71.43,42.89 76.19,39.59 80.95,43.76 85.71,34.50 90.48,27.08 95.24,21.81 100.00,23.34" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 249.49 -> 243.55</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.36%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.09%</strong></div>
+        <div><b>No text</b><strong>+7.26%</strong></div>
+        <div><b>Text only</b><strong>-2.11%</strong></div>
+      </div>
+      <label>Content share 51.5%</label>
+      <span class='bar'><span style='width:51.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.5%</label>
+      <span class='bar'><span style='width:48.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #4 · 2025-04-01</div>
+      <h3>JPMorgan Chase Fixed-Rate Preferred Shares Offer Attractive Income And Appreciation</h3>
+      <p>JPMorgan Chase &amp; Co.&#x27;s preferred distributions are well covered by 2024 earnings and current common equity market capitalization. Provisioning already reflects some deterioration in macroeconomic fundamentals, making large provision builds in Q1 2025 unlikely. I present a bull and bear case for the Series JJ Preferred shares. I think the bull case h</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,37.47 4.76,31.71 9.52,31.85 14.29,28.21 19.05,19.27 23.81,15.00 28.57,15.14 33.33,19.19 38.10,26.51 42.86,23.11 47.62,25.39 52.38,22.38 57.14,46.20 61.90,70.00 66.67,64.18 71.43,60.78 76.19,36.34 80.95,46.45 85.71,33.74 90.48,35.81 95.24,38.03 100.00,42.96" />
+        </svg>
+        <small>2025-03-18 -&gt; 2025-04-16 · close 233.53 -> 229.61</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.03%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.89%</strong></div>
+        <div><b>No text</b><strong>+6.89%</strong></div>
+        <div><b>Text only</b><strong>-5.16%</strong></div>
+      </div>
+      <label>Content share 51.5%</label>
+      <span class='bar'><span style='width:51.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.5%</label>
+      <span class='bar'><span style='width:48.5%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Diagnostics</h2>
+  <section class="image-row">
+    <img src="gate_timeline_JPM.png" alt="Gate timeline">
+    <img src="content_noise_scatter_JPM.png" alt="Content noise scatter">
+  </section>
+</main>
+</body>
+</html>

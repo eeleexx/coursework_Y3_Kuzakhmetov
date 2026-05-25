@@ -1,0 +1,67 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.dvi
+*.fdb_latexmk
+*.fls
+*.lof
+*.log
+*.lot
+*.nav
+*.out
+*.ps
+*.run.xml
+*.snm
+*.synctex.gz
+*.toc
+*.vrb
+*.xdv
+
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.cache/
+.matplotlib-cache/
+.venv/
+venv/
+env/
+
+# Jupyter and notebook checkpoints
+.ipynb_checkpoints/
+
+# Local OS/editor files
+.DS_Store
+._*
+Thumbs.db
+*.swp
+*.swo
+.idea/
+.vscode/
+
+# Local secrets
+.env
+.env.*
+*.key
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Large local datasets
+data/SPY_concat_files.csv
+data/spy_1min_tweet_price_dataset.csv
+
+# Model/checkpoint artifacts
+*.ckpt
+*.h5
+*.joblib
+*.onnx
+*.pkl
+*.pt
+*.pth

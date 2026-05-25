@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventLens · INTC</title>
+  <style>
+    :root {
+      --ink: #16211f;
+      --muted: #64706d;
+      --paper: #f7f1e5;
+      --card: #fffaf0;
+      --green: #2a9d8f;
+      --orange: #e76f51;
+      --blue: #264653;
+      --line: rgba(22, 33, 31, .14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(231, 111, 81, .18), transparent 28rem),
+        radial-gradient(circle at 84% 4%, rgba(42, 157, 143, .18), transparent 24rem),
+        linear-gradient(135deg, #fbf7ed, var(--paper));
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 48px 22px 72px; }
+    header { display: grid; grid-template-columns: 1.4fr .9fr; gap: 28px; align-items: end; }
+    h1 { font-size: clamp(48px, 8vw, 110px); line-height: .9; margin: 0; letter-spacing: -0.06em; }
+    h2 { font-size: 30px; margin: 48px 0 18px; }
+    h3 { font-size: 22px; margin: 8px 0 10px; line-height: 1.12; }
+    p { color: var(--muted); line-height: 1.55; }
+    .hero-note {
+      border-left: 5px solid var(--orange);
+      padding-left: 18px;
+      font-size: 18px;
+    }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 34px 0; }
+    .kpi, .event-card, .panel {
+      background: rgba(255, 250, 240, .78);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 45px rgba(38, 70, 83, .08);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .kpi b { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    .kpi strong { display: block; font-size: 30px; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .event-meta { color: var(--orange); text-transform: uppercase; font-size: 12px; letter-spacing: .12em; font-weight: 700; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .chips span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: white; font-size: 13px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 16px; }
+    .metric-grid div { border-top: 1px solid var(--line); padding-top: 8px; }
+    .metric-grid b { display: block; color: var(--muted); font-size: 12px; }
+    .metric-grid strong { font-size: 19px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    .bar { display: block; height: 10px; background: rgba(38, 70, 83, .12); border-radius: 999px; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.42); border-radius: 18px; overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .image-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    img { width: 100%; border-radius: 20px; border: 1px solid var(--line); background: white; }
+    .sparkline { margin: 12px 0 14px; padding: 10px; background: rgba(255,255,255,.52); border-radius: 16px; border: 1px solid var(--line); }
+    .sparkline svg { width: 100%; height: 92px; display: block; }
+    .sparkline polyline { fill: none; stroke: var(--blue); stroke-width: 2.3; vector-effect: non-scaling-stroke; }
+    .sparkline .event-line { stroke: var(--orange); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+    .sparkline small { color: var(--muted); display: block; margin-top: 6px; }
+    @media (max-width: 860px) {
+      header, .grid, .kpis, .image-row { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="event-meta">Multimodal causal model demo</div>
+      <h1>EventLens<br>INTC</h1>
+    </div>
+    <p class="hero-note">
+      Static dashboard for the Headline vs Content hypothesis. It shows where the model
+      treated news as market-relevant content and where it routed text into private noise.
+    </p>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><b>Validation events</b><strong>203</strong></div>
+    <div class="kpi"><b>Average text gate</b><strong>0.46</strong></div>
+    <div class="kpi"><b>Average noise ratio</b><strong>0.49</strong></div>
+    <div class="kpi"><b>Best MSE model</b><strong>static_fusion</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline Comparison</h2>
+    <table>
+      <thead><tr><th>Model</th><th>MSE</th><th>MAE</th><th>Direction</th><th>IC</th></tr></thead>
+      <tbody><tr><td>price_only</td><td>0.002017</td><td>0.035314</td><td>0.414</td><td>+0.013</td></tr>
+<tr><td>text_only</td><td>0.001961</td><td>0.033290</td><td>0.463</td><td>-0.033</td></tr>
+<tr><td>static_fusion</td><td>0.001797</td><td>0.030596</td><td>0.581</td><td>+0.166</td></tr>
+<tr><td>full_drl</td><td>0.001936</td><td>0.031910</td><td>0.581</td><td>+0.110</td></tr></tbody>
+    </table>
+  </section>
+
+  <h2>Largest Market Reactions</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #1 · 2025-04-08</div>
+      <h3>Intel: New CEO Or Not, It&#x27;s 18A Or Bust</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,22.07 9.52,20.26 14.29,28.50 19.05,28.50 23.81,34.48 28.57,35.12 33.33,31.04 38.10,54.42 42.86,56.95 47.62,70.00 52.38,39.19 57.14,54.14 61.90,55.41 66.67,50.25 71.43,54.42 76.19,60.03 80.95,62.75 85.71,63.57 90.48,57.50 95.24,47.71 100.00,39.56" />
+        </svg>
+        <small>2025-03-25 -&gt; 2025-04-24 · close 24.20 -> 21.49</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.56%</strong></div>
+        <div><b>Actual T+1</b><strong>+18.75%</strong></div>
+        <div><b>No text</b><strong>+2.05%</strong></div>
+        <div><b>Text only</b><strong>-4.72%</strong></div>
+      </div>
+      <label>Content share 50.8%</label>
+      <span class='bar'><span style='width:50.8%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.2%</label>
+      <span class='bar'><span style='width:49.2%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #2 · 2025-04-08</div>
+      <h3>Wall Street Gave Up On Intel - Should You Bet Against The Crowd</h3>
+      <p>Intel is undergoing a strategic overhaul to regain competitiveness, including splitting its foundry operations and revamping its chip design roadmap. The stock trades at a deep discount, reflecting skepticism that may overlook improving execution and long-term potential. Management is candid about past failures and is now aggressively investing in technology</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,22.07 9.52,20.26 14.29,28.50 19.05,28.50 23.81,34.48 28.57,35.12 33.33,31.04 38.10,54.42 42.86,56.95 47.62,70.00 52.38,39.19 57.14,54.14 61.90,55.41 66.67,50.25 71.43,54.42 76.19,60.03 80.95,62.75 85.71,63.57 90.48,57.50 95.24,47.71 100.00,39.56" />
+        </svg>
+        <small>2025-03-25 -&gt; 2025-04-24 · close 24.20 -> 21.49</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-1.59%</strong></div>
+        <div><b>Actual T+1</b><strong>+18.75%</strong></div>
+        <div><b>No text</b><strong>+2.05%</strong></div>
+        <div><b>Text only</b><strong>-7.17%</strong></div>
+      </div>
+      <label>Content share 50.5%</label>
+      <span class='bar'><span style='width:50.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.5%</label>
+      <span class='bar'><span style='width:49.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #3 · 2025-03-12</div>
+      <h3>Intel&#x27;s Back On The Market: Market Cap Of $87.42B Is Too Low -- Upgrading To Buy</h3>
+      <p>Our sell call played out well, with Intel Corporation crashing as much as 25% since we said to step out in February. Now, we&#x27;re revisiting the stock and upgrading to a buy. Intel Corporation now makes for an attractive takeover candidate and could see potential gains on PC Client TAM expansion, although tariff risks remain. News broke this morning on a </p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,36.50 4.76,40.35 9.52,34.62 14.29,43.49 19.05,56.12 23.81,60.77 28.57,61.31 33.33,62.30 38.10,68.66 42.86,70.00 47.62,61.94 52.38,34.89 57.14,31.75 61.90,17.06 66.67,15.00 71.43,31.12 76.19,32.56 80.95,29.87 85.71,30.23 90.48,30.41 95.24,37.39 100.00,35.60" />
+        </svg>
+        <small>2025-02-26 -&gt; 2025-03-27 · close 23.52 -> 23.62</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-1.48%</strong></div>
+        <div><b>Actual T+1</b><strong>+14.60%</strong></div>
+        <div><b>No text</b><strong>+1.88%</strong></div>
+        <div><b>Text only</b><strong>-6.44%</strong></div>
+      </div>
+      <label>Content share 50.2%</label>
+      <span class='bar'><span style='width:50.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.8%</label>
+      <span class='bar'><span style='width:49.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #4 · 2024-08-29</div>
+      <h3>Intel: The Turnaround Faces Massive Challenges</h3>
+      <p>My previous Sell rating for Intel has been spot on as Wall Street punishes the stock due to lack of a clear roadmap toward growth. Intel has announced several changes including layoffs, dividend cuts, and capex reduction which might have a positive impact in the near term. However, one of the biggest drawbacks for Intel has been the wrong long term strategy </p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,38.57 4.76,35.43 9.52,24.08 14.29,33.33 19.05,26.00 23.81,48.87 28.57,41.19 33.33,48.35 38.10,49.40 42.86,57.43 47.62,48.35 52.38,15.00 57.14,48.87 61.90,60.57 66.67,61.10 71.43,70.00 76.19,66.86 80.95,68.43 85.71,56.90 90.48,61.79 95.24,56.56 100.00,34.73" />
+        </svg>
+        <small>2024-08-15 -&gt; 2024-09-16 · close 20.69 -> 20.91</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-2.24%</strong></div>
+        <div><b>Actual T+1</b><strong>+9.49%</strong></div>
+        <div><b>No text</b><strong>+2.03%</strong></div>
+        <div><b>Text only</b><strong>-7.26%</strong></div>
+      </div>
+      <label>Content share 51.7%</label>
+      <span class='bar'><span style='width:51.7%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.3%</label>
+      <span class='bar'><span style='width:48.3%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #5 · 2025-01-16</div>
+      <h3>Intel&#x27;s Big Day</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,51.73 4.76,48.28 9.52,41.38 14.29,55.39 19.05,52.55 23.81,55.18 28.57,70.00 33.33,68.99 38.10,68.99 42.86,58.43 47.62,59.45 52.38,22.51 57.14,16.83 61.90,15.00 66.67,20.89 71.43,35.90 76.19,46.86 80.95,56.81 85.71,57.82 90.48,52.55 95.24,64.32 100.00,65.33" />
+        </svg>
+        <small>2024-12-31 -&gt; 2025-02-03 · close 20.05 -> 19.38</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.31%</strong></div>
+        <div><b>Actual T+1</b><strong>+9.25%</strong></div>
+        <div><b>No text</b><strong>+2.07%</strong></div>
+        <div><b>Text only</b><strong>-3.80%</strong></div>
+      </div>
+      <label>Content share 49.5%</label>
+      <span class='bar'><span style='width:49.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 50.5%</label>
+      <span class='bar'><span style='width:50.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #6 · 2024-08-30</div>
+      <h3>Intel: Is The Moat Still Intact?</h3>
+      <p>The brand has historically been strong in high-performance gaming, but recent financial struggles raise concerns about its future. Debt levels and uncertain future cash flows make it difficult to accurately value the company. Intrinsic value is probably substantially lower than market.</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,35.43 4.76,24.08 9.52,33.33 14.29,26.00 19.05,48.87 23.81,41.19 28.57,48.35 33.33,49.40 38.10,57.43 42.86,48.35 47.62,15.00 52.38,48.87 57.14,60.57 61.90,61.10 66.67,70.00 71.43,66.86 76.19,68.43 80.95,56.90 85.71,61.79 90.48,56.56 95.24,34.73 100.00,24.95" />
+        </svg>
+        <small>2024-08-16 -&gt; 2024-09-17 · close 20.87 -> 21.47</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-2.58%</strong></div>
+        <div><b>Actual T+1</b><strong>-8.80%</strong></div>
+        <div><b>No text</b><strong>+2.05%</strong></div>
+        <div><b>Text only</b><strong>-7.41%</strong></div>
+      </div>
+      <label>Content share 52.8%</label>
+      <span class='bar'><span style='width:52.8%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.2%</label>
+      <span class='bar'><span style='width:47.2%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Content-Like Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">content #1 · 2024-12-06</div>
+      <h3>Intel: The Problems Gelsinger Leaves Behind</h3>
+      <p>Intel&#x27;s CEO Pat Gelsinger&#x27;s departure highlights Intel&#x27;s struggles with semiconductor leadership and competition from Nvidia, leading to revenue loss and market cap decline. Gelsinger&#x27;s unrealistic goals and managerial style led to misrepresented progress, culminating in the failure of the &quot;&quot;5 nodes in 4 years&quot;&quot; strate</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,19.07 4.76,18.50 9.52,15.00 14.29,22.76 19.05,26.55 23.81,22.76 28.57,23.90 33.33,37.72 38.10,42.55 42.86,53.53 47.62,52.39 52.38,53.43 57.14,59.59 61.90,59.97 66.67,53.72 71.43,57.88 76.19,53.24 80.95,56.94 85.71,67.73 90.48,70.00 95.24,65.65 100.00,59.21" />
+        </svg>
+        <small>2024-11-21 -&gt; 2024-12-23 · close 24.44 -> 20.20</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-2.80%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.53%</strong></div>
+        <div><b>No text</b><strong>+2.06%</strong></div>
+        <div><b>Text only</b><strong>-7.02%</strong></div>
+      </div>
+      <label>Content share 53.4%</label>
+      <span class='bar'><span style='width:53.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.6%</label>
+      <span class='bar'><span style='width:46.6%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #2 · 2024-10-28</div>
+      <h3>Intel: Make-Or-Break Earnings Moment</h3>
+      <p>Intel has been one of the worst performers this year, as the stock corrected after every earnings result. Over the past year, I have mentioned that Intel’s main headwind is the wrong strategy within the foundry business where it competes with highly efficient TSM. The upcoming earnings result is a make-or-break moment for the company, and the management need</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,47.58 4.76,56.69 9.52,60.77 14.29,59.26 19.05,55.40 23.81,54.59 28.57,59.72 33.33,64.63 38.10,60.42 42.86,56.45 47.62,53.65 52.38,53.89 57.14,60.89 61.90,70.00 66.67,50.38 71.43,58.32 76.19,48.98 80.95,28.78 85.71,15.00 90.48,15.35 95.24,28.78 100.00,39.17" />
+        </svg>
+        <small>2024-10-14 -&gt; 2024-11-12 · close 23.44 -> 24.16</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-2.41%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.09%</strong></div>
+        <div><b>No text</b><strong>+2.11%</strong></div>
+        <div><b>Text only</b><strong>-7.50%</strong></div>
+      </div>
+      <label>Content share 52.1%</label>
+      <span class='bar'><span style='width:52.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.9%</label>
+      <span class='bar'><span style='width:47.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #3 · 2025-03-20</div>
+      <h3>Intel: A Sum-Of-Parts Valuation Analysis Shows Significant Upside</h3>
+      <p>Intel, with declining revenues, margins, and asset efficiency, faces significant challenges. Despite restructuring efforts, Intel&#x27;s financial performance continues to decline, with FY24 revenues down 33% from FY21 and net income turning negative. A sum of parts of three independent units - Intel Products, Intel Foundry, and Architecture Design - points </p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,61.31 4.76,62.30 9.52,68.66 14.29,70.00 19.05,61.94 23.81,34.89 28.57,31.75 33.33,17.06 38.10,15.00 42.86,31.12 47.62,32.56 52.38,29.87 57.14,30.23 61.90,30.41 66.67,37.39 71.43,35.60 76.19,43.75 80.95,43.75 85.71,49.67 90.48,50.29 95.24,46.26 100.00,69.37" />
+        </svg>
+        <small>2025-03-06 -&gt; 2025-04-04 · close 20.75 -> 19.85</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-3.03%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.25%</strong></div>
+        <div><b>No text</b><strong>+1.86%</strong></div>
+        <div><b>Text only</b><strong>-7.68%</strong></div>
+      </div>
+      <label>Content share 53.1%</label>
+      <span class='bar'><span style='width:53.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.9%</label>
+      <span class='bar'><span style='width:46.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #4 · 2024-09-10</div>
+      <h3>Intel: Stay Away From Falling Knives</h3>
+      <p>Intel&#x27;s stock remains significantly overvalued despite a 37% drop since mid-June, with a &quot;&quot;Strong Sell&quot;&quot; rating due to inefficiencies and poor strategic decisions. Recent quarterly earnings missed estimates, with revenue down 1% YoY and adjusted EPS dropping to $0.02, highlighting financial struggles. Intel&#x27;s balance sheet is we</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,55.33 4.76,56.04 9.52,61.48 14.29,55.33 19.05,32.74 23.81,55.69 28.57,63.61 33.33,63.97 38.10,70.00 42.86,67.87 47.62,68.94 52.38,61.13 57.14,64.44 61.90,60.89 66.67,46.11 71.43,39.48 76.19,47.76 80.95,43.39 85.71,35.11 90.48,26.59 95.24,23.63 100.00,15.00" />
+        </svg>
+        <small>2024-08-26 -&gt; 2024-09-25 · close 20.13 -> 23.54</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-3.61%</strong></div>
+        <div><b>Actual T+1</b><strong>+3.48%</strong></div>
+        <div><b>No text</b><strong>+1.96%</strong></div>
+        <div><b>Text only</b><strong>-9.40%</strong></div>
+      </div>
+      <label>Content share 54.0%</label>
+      <span class='bar'><span style='width:54.0%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.0%</label>
+      <span class='bar'><span style='width:46.0%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Noise-Heavy Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">noise #1 · 2025-02-04</div>
+      <h3>Intel Stock Is At A Pivotal Moment (Technical Analysis)</h3>
+      <p>Our methodology projects via probabilities, providing clear parameters for validation or revision of our scenario for Intel Corporation. The larger structure of price on the Intel stock chart suggests a bearish context. Markets are emotional and irrational; our methodology ranks probabilistic movements, allowing quick adjustments when patterns break in stock</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,52.29 4.76,51.69 9.52,53.61 14.29,58.52 19.05,62.10 23.81,65.36 28.57,65.69 33.33,63.96 38.10,67.81 42.86,68.14 47.62,68.74 52.38,66.35 57.14,68.14 61.90,70.00 66.67,65.55 71.43,57.59 76.19,47.58 80.95,36.63 85.71,40.14 90.48,15.00 95.24,26.08 100.00,23.62" />
+        </svg>
+        <small>2025-01-21 -&gt; 2025-02-20 · close 21.77 -> 26.09</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.96%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.87%</strong></div>
+        <div><b>No text</b><strong>+2.00%</strong></div>
+        <div><b>Text only</b><strong>-5.46%</strong></div>
+      </div>
+      <label>Content share 49.4%</label>
+      <span class='bar'><span style='width:49.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 50.6%</label>
+      <span class='bar'><span style='width:50.6%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #2 · 2025-05-16</div>
+      <h3>Intel: Unable To Absorb AI Tailwinds</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="66.67" y1="6" x2="66.67" y2="74" class="event-line" />
+          <polyline points="0.00,55.73 6.67,63.07 13.33,70.00 20.00,62.23 26.67,47.75 33.33,38.93 40.00,22.98 46.67,15.00 53.33,36.83 60.00,36.20 66.67,33.89 73.33,39.77 80.00,42.08 86.67,54.26 93.33,57.19 100.00,67.69" />
+        </svg>
+        <small>2025-05-02 -&gt; 2025-05-23 · close 20.62 -> 20.05</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-1.08%</strong></div>
+        <div><b>Actual T+1</b><strong>-1.29%</strong></div>
+        <div><b>No text</b><strong>+2.03%</strong></div>
+        <div><b>Text only</b><strong>-5.64%</strong></div>
+      </div>
+      <label>Content share 49.5%</label>
+      <span class='bar'><span style='width:49.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 50.5%</label>
+      <span class='bar'><span style='width:50.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #3 · 2025-01-16</div>
+      <h3>Intel&#x27;s Big Day</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,51.73 4.76,48.28 9.52,41.38 14.29,55.39 19.05,52.55 23.81,55.18 28.57,70.00 33.33,68.99 38.10,68.99 42.86,58.43 47.62,59.45 52.38,22.51 57.14,16.83 61.90,15.00 66.67,20.89 71.43,35.90 76.19,46.86 80.95,56.81 85.71,57.82 90.48,52.55 95.24,64.32 100.00,65.33" />
+        </svg>
+        <small>2024-12-31 -&gt; 2025-02-03 · close 20.05 -> 19.38</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.31%</strong></div>
+        <div><b>Actual T+1</b><strong>+9.25%</strong></div>
+        <div><b>No text</b><strong>+2.07%</strong></div>
+        <div><b>Text only</b><strong>-3.80%</strong></div>
+      </div>
+      <label>Content share 49.5%</label>
+      <span class='bar'><span style='width:49.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 50.5%</label>
+      <span class='bar'><span style='width:50.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #4 · 2024-10-31</div>
+      <h3>Intel Remains Broken</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,59.26 4.76,55.40 9.52,54.59 14.29,59.72 19.05,64.63 23.81,60.42 28.57,56.45 33.33,53.65 38.10,53.89 42.86,60.89 47.62,70.00 52.38,50.38 57.14,58.32 61.90,48.98 66.67,28.78 71.43,15.00 76.19,15.35 80.95,28.78 85.71,39.17 90.48,30.30 95.24,29.01 100.00,36.95" />
+        </svg>
+        <small>2024-10-17 -&gt; 2024-11-15 · close 22.44 -> 24.35</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.71%</strong></div>
+        <div><b>Actual T+1</b><strong>+7.81%</strong></div>
+        <div><b>No text</b><strong>+2.09%</strong></div>
+        <div><b>Text only</b><strong>-6.28%</strong></div>
+      </div>
+      <label>Content share 49.5%</label>
+      <span class='bar'><span style='width:49.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 50.5%</label>
+      <span class='bar'><span style='width:50.5%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Diagnostics</h2>
+  <section class="image-row">
+    <img src="gate_timeline_INTC.png" alt="Gate timeline">
+    <img src="content_noise_scatter_INTC.png" alt="Content noise scatter">
+  </section>
+</main>
+</body>
+</html>

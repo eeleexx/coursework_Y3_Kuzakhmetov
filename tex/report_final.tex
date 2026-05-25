@@ -1,0 +1,861 @@
+\documentclass[12pt, a4paper]{article}
+
+% ── Encoding & Language ──
+\usepackage[T2A]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[russian,english]{babel}
+
+% ── Layout ──
+\usepackage[left=30mm, right=15mm, top=20mm, bottom=20mm]{geometry}
+\usepackage{setspace}
+\onehalfspacing
+
+% ── Packages ──
+\usepackage{amsmath, amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{hyperref}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{listings}
+\usepackage{xcolor}
+\usepackage{multirow}
+\usepackage{etoolbox}
+
+\hypersetup{
+    colorlinks=true,
+    linkcolor=blue!60!black,
+    citecolor=blue!60!black,
+    urlcolor=blue!60!black,
+}
+
+\pretocmd{\section}{\clearpage}{}{}
+
+\lstset{
+    basicstyle=\ttfamily\small,
+    breaklines=true,
+    frame=single,
+    backgroundcolor=\color{gray!5},
+}
+
+% ══════════════════════════════════════════════════════════════
+\begin{document}
+
+% ── Title Page ──
+\begin{titlepage}
+    \begin{center}
+        \textbf{NATIONAL RESEARCH UNIVERSITY}\\
+        \textbf{HIGHER SCHOOL OF ECONOMICS}\\[4pt]
+        Faculty of Computer Science\\
+        Bachelor's Programme ``Data Science and Business Analytics''\\[4pt]
+        \begin{flushleft}
+        UDC 004.85, 336.76
+        \end{flushleft}
+        \vspace{-0.5cm}
+        \vspace{40pt}
+
+        \vfill
+
+        {\Large \textbf{Research Project Report on the Topic:}}\\[20pt]
+
+        {\LARGE \textbf{Multimodal Model for Causal Analysis\\of Information Flow on Stock Prices}}\\[40pt]
+
+        \vfill
+
+        \begin{flushright}
+            \begin{tabular}{rl}
+                \textbf{Student:}     & Kuzakhmetov Ilmir Rinatovich \\
+                                      & Group БПАД233, 3rd year \\[8pt]
+                \textbf{Supervisor:}  & Bashminova Daria Aleksandrovna \\
+                                      & Research Fellow, Faculty of CS, HSE \\
+            \end{tabular}
+        \end{flushright}
+
+        \vfill
+        Moscow, 2026
+    \end{center}
+\end{titlepage}
+
+% ── Abstracts and Keywords ──
+\begin{abstract}
+This report presents the final results of a research project developing a Disentangled Multimodal Learning framework for analysing financial information flow and stock-price reactions. The proposed architecture separates latent representations into market-invariant (``content'') and modality-specific (``noise'') subspaces using Disentangled Representation Learning, aligns cross-modal signals via Momentum Contrastive Learning, and dynamically reweights textual input through a Reliability-Aware Gated Fusion mechanism. The empirical study uses financial news and daily OHLCV data for six US equities from 2019 to 2025, complemented by a second SPY 1-minute social information-flow study using tweet attention and sentiment. Across six equities, the full DRL model achieves the best mean MSE and MAE and wins the MSE comparison on four out of six tickers. Latent diagnostics, synthetic controlled validation, and EventLens dashboards provide interpretable evidence for the ``headline noise vs. content'' hypothesis. The SPY intraday study shows that tweet-attention spikes are associated with substantially larger absolute 5-minute reactions and higher trading volume, while directional predictability remains weak.
+\end{abstract}
+
+\noindent\textbf{Keywords:} multimodal learning, financial NLP, FinBERT, disentangled representation learning, stock returns, information flow, event study.
+
+\newpage
+
+\selectlanguage{russian}
+\begin{abstract}
+В работе представлен интерпретируемый мультимодальный подход к анализу информационного потока и реакции цен акций. Архитектура объединяет текстовые представления FinBERT, LSTM-кодировщик ценовых рядов, разделение латентного пространства на общие и частные компоненты, контрастивное выравнивание модальностей и механизм надежностного gated fusion. Эмпирическая часть использует финансовые новости и дневные OHLCV-данные по шести акциям США за 2019--2025 годы, а также отдельное внутридневное исследование SPY на минутных данных с агрегированными твитами. Полная DRL-модель показывает лучшую среднюю MSE и MAE среди базовых моделей, а интерпретационные диагностики, синтетическая проверка и EventLens демонстрируют различие между содержательным сигналом и информационным шумом. Внутридневная часть показывает, что всплески социального внимания связаны с более сильной абсолютной реакцией цены и объемом торгов, но не дают устойчивого directional alpha.
+\end{abstract}
+
+\noindent\textbf{Ключевые слова:} мультимодальное обучение, финансовые тексты, FinBERT, разделенное представление, доходности акций, информационный поток.
+\selectlanguage{english}
+
+\newpage
+
+% ── Table of Contents ──
+\tableofcontents
+\newpage
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Introduction}
+\label{sec:intro}
+
+In the contemporary landscape of high-frequency trading and quantitative finance, asset prices are driven by an increasingly complex interplay of fundamental economic indicators and vast streams of unstructured data. While the Efficient Market Hypothesis (EMH) posits that prices instantaneously reflect all available information, the mechanism of this absorption is far from instantaneous or rational. Market participants are inundated with a mixture of high-quality ``signals'' (fundamental news, earnings reports) and ``noise'' (clickbait headlines, social media hype, and algorithmic ``slop''). The inability of traditional predictive models to distinguish between these two categories leads to what is known as the \textit{semantic mixture problem}, where genuine predictive drivers are drowned out by high-frequency market microstructure noise.
+
+The rapid proliferation of Large Language Models (LLMs) in financial analytics has introduced a new layer of complexity. While state-of-the-art NLP models like BERT or FinBERT excel at sentiment classification, they often struggle with \textit{multimodal heterogeneity}: textual data and numerical time-series data possess fundamentally different distributional properties. Standard deep learning approaches typically employ ``static fusion'' or simple concatenation of these modalities, assuming that both text and price history are equally reliable at all times. However, empirical evidence suggests that this assumption is flawed: during periods of high volatility or market panic, textual sentiment may be a lagging indicator or a contrarian signal, while technical momentum becomes dominant.
+
+Furthermore, a critical limitation of existing ``black-box'' neural networks is the lack of \textit{causal interpretability}. Most current architectures are correlation engines---they identify that specific words co-occur with price drops---but fail to establish \textit{why} or \textit{if} a causal link exists. The emerging field of Disentangled Representation Learning (DRL) offers a mathematical framework to address this by separating latent factors into ``market-invariant'' (shared across modalities) and ``modality-specific'' (noise) subspaces.
+
+This research project aims to bridge these gaps by developing an interpretable multimodal model for information-flow analysis. The proposed architecture implements an Adaptive Modality Fusion (AMF) mechanism combined with disentangled representation learning. By treating financial information flow not as a monolithic input but as a composite of disentangled latent factors, this study estimates and diagnoses the contribution of text-derived information to stock-price reactions without claiming formal causal identification.
+
+This final report documents the complete implemented pipeline: data preparation, multimodal architecture, baseline and ablation experiments, latent content/noise analysis, controlled synthetic validation, static EventLens interpretability dashboards, and a SPY 1-minute social information-flow study.
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Literature Review}
+\label{sec:litreview}
+
+The following review analyses five key publications that form the theoretical and methodological foundation of this project. Each paper is examined along four dimensions: what the authors studied, its connection to the present work, the methods employed, and the principal findings.
+
+\subsection{Bentaleb et al.\ (2025) --- Adaptive Fusion~[1]}
+
+\textbf{Description.}
+Bentaleb, Ben~Houad, and Mestari investigate the problem of fusing heterogeneous data streams---textual news sentiment and numerical technical indicators---for stock trend prediction. They argue that the relative importance of each modality varies with market conditions: textual sentiment dominates around corporate events (earnings calls, product launches), while technical indicators are more informative during trend-following regimes.
+
+\textbf{Connection to this project.}
+This paper directly motivates the \textit{Gated Fusion Layer} in our architecture (Phase~2). Rather than implementing their exact AMFNet, we adapt the core principle of uncertainty-aware dynamic reweighting: our fusion gate estimates a textual confidence score $g \in [0, 1]$ that down-weights news input when its private (noise) component is large. AMFNet demonstrates that such adaptive mechanisms outperform static concatenation, validating our architectural choice.
+
+\textbf{Methods.}
+The authors propose AMFNet, a neural architecture that processes candlestick chart images (CNN branch) and financial news text (NLP branch) in parallel. An attention-based gating module computes per-timestep reliability scores for each modality. The model is trained on a ternary classification task (up / down / flat) using 5 years of data from the Casablanca Stock Exchange (MASI index). Evaluation metrics include accuracy, F1-score, and a custom ``regime-aware'' accuracy that separately reports performance during volatile vs.\ calm periods.
+
+\textbf{Results.}
+AMFNet achieves 62.4\% ternary classification accuracy, outperforming static concatenation (57.1\%) and unimodal baselines (text-only: 54.8\%, price-only: 55.3\%). Crucially, the improvement is concentrated in high-volatility periods (+8.2\% accuracy), where the adaptive gate learned to suppress noisy textual sentiment---consistent with our Hypothesis~\textbf{H2}.
+
+
+\subsection{Cao and Geman (2025) --- Hype-Adjusted Probability Measure~[2]}
+
+\textbf{Description.}
+Cao and Geman address the problem of \textit{media hype}---defined as excessive news volume relative to a company's market capitalisation---and its distortive effect on NLP-based stock return forecasts. They propose a mathematical correction that adjusts sentiment-derived probability distributions to account for information inflation.
+
+\textbf{Connection to this project.}
+This work provides empirical justification for our Hypothesis~\textbf{H4} (news volume correlates with volatility) and supports the design decision to include private (noise) subspaces in the Disentanglement Module. The ``hype'' that Cao and Geman quantify is precisely the type of signal our model routes into the private text subspace, where it is subsequently down-weighted by the gated fusion layer.
+
+\textbf{Methods.}
+The authors construct a hype index $H_t = \log(\text{ArticleCount}_t / \text{MarketCap}_t)$ for each trading day and incorporate it as a multiplicative correction to FinBERT-derived sentiment probabilities. They evaluate the corrected forecasts on daily returns for 50 S\&P~500 constituents over 2018--2023, comparing against uncorrected FinBERT baselines using MSE, directional accuracy, and volatility forecasting R\textsuperscript{2}.
+
+\textbf{Results.}
+The hype-adjusted model improves volatility forecasting R\textsuperscript{2} by 8\% over the uncorrected baseline. Directional accuracy improves by 2.1 percentage points. The improvement is strongest for small-cap stocks with high media-to-capitalisation ratios, confirming that hype correction is most valuable when information asymmetry is greatest.
+
+
+\subsection{Du et al.\ (2026) --- MISA-GMC Framework~[3]}
+
+\textbf{Description.}
+Du, Wang, Yang, Im, and Wang propose MISA-GMC, a multimodal sentiment analysis framework that combines \textit{modality-invariant} and \textit{modality-specific} representation learning with Gated Fusion and Momentum Contrastive (MoCo) regularisation. The paper addresses the ``semantic mixture'' problem in which shared sentiment signals are entangled with channel-specific noise.
+
+\textbf{Connection to this project.}
+MISA-GMC is the most direct methodological predecessor of our architecture. We adopt three key components from this work: (i)~the shared/private subspace decomposition for the Disentanglement Module, (ii)~the difference loss $\|\mathbf{S}^\top \mathbf{P}\|_F^2$ for enforcing orthogonality, and (iii)~the MoCo objective for aligning shared representations across modalities. However, we adapt these components from general sentiment analysis to the specific financial domain, replacing their text/audio/video modalities with text/price-series modalities and adding a financial prediction head.
+
+\textbf{Methods.}
+The architecture uses three encoders (text, audio, video) that feed into projection layers producing shared and private vectors. Orthogonality is enforced via a Frobenius-norm difference loss. A momentum contrastive queue (InfoNCE loss) aligns the shared representations of all modality pairs. Evaluation is performed on CMU-MOSI and CMU-MOSEI sentiment benchmarks using binary accuracy, F1, MAE, and Pearson correlation.
+
+\textbf{Results.}
+MISA-GMC achieves state-of-the-art binary sentiment accuracy of 86.2\% on CMU-MOSI and 85.7\% on CMU-MOSEI, improving over MISA (the predecessor model without MoCo) by 1.8\% and 1.3\% respectively. Ablation studies confirm that both the difference loss and MoCo components contribute to the improvement, with MoCo providing the larger marginal gain (+1.1\%).
+
+
+\subsection{Hashami and Maldonado (2025) --- SHAP for Oil Volatility~[4]}
+
+\textbf{Description.}
+Hashami and Maldonado investigate whether financial news can predict the \textit{direction} of oil price volatility using Large Language Models, and deploy SHAP (Shapley Additive Explanations) to interpret model decisions. The paper bridges the gap between predictive accuracy and causal interpretability in financial NLP.
+
+\textbf{Connection to this project.}
+This paper motivates the interpretability component of the project. Instead of applying full KernelSHAP, which is computationally expensive for the present deep multimodal architecture, this work uses latent diagnostics, content/noise norms, gate dynamics, and EventLens case studies to quantify the marginal role of text-derived representations. The paper also validates that LLM-derived embeddings contain actionable predictive signals---a key assumption underlying our use of FinBERT.
+
+\textbf{Methods.}
+The authors fine-tune a BERT-based classifier on Reuters oil market news (2015--2023) for binary volatility direction prediction (up/down). Post-hoc interpretability is provided via KernelSHAP, applied to the attention-weighted embedding layer. They cluster SHAP values by lexical topic (e.g., ``supply shock'', ``geopolitical risk'', ``demand growth'') to identify which semantic categories drive predictions.
+
+\textbf{Results.}
+The LLM achieves 71.3\% directional accuracy on out-of-sample data, outperforming a tf-idf + logistic regression baseline (63.8\%). SHAP analysis reveals that ``supply disruption'' tokens contribute 3.2$\times$ more to upward-volatility predictions than ``policy uncertainty'' tokens, confirming that distinct lexical clusters have asymmetric causal impacts on volatility direction.
+
+
+\subsection{Wang et al.\ (2024) --- Disentangled Representation Learning~[5]}
+
+\textbf{Description.}
+Wang, Chen, Tang, Wu, and Zhu provide a comprehensive theoretical survey of Disentangled Representation Learning (DRL), covering variational, adversarial, and contrastive approaches to separating latent generative factors into independent subspaces. The paper formalises the mathematical conditions under which disentanglement is achievable and identifiable.
+
+\textbf{Connection to this project.}
+This survey provides the theoretical foundation for our Disentanglement Module. Specifically, we rely on the paper's formulation of ``subspace disentanglement'' where representations are decomposed into shared (cross-modal invariant) and private (modality-specific) components. The theoretical identifiability conditions discussed by Wang et al.\ inform our choice of the difference loss as a regulariser: it enforces the orthogonality constraint that is a necessary (though not sufficient) condition for disentanglement.
+
+\textbf{Methods.}
+The paper reviews three families of DRL methods: (i)~VAE-based approaches that impose factorial priors on latent variables, (ii)~GAN-based approaches that use adversarial training to enforce independence, and (iii)~contrastive approaches that maximise mutual information between latent factors and designated generative factors. The authors evaluate each family on dSprites, CelebA, and synthetic benchmarks using DCI, MIG, and SAP disentanglement metrics.
+
+\textbf{Results.}
+Contrastive methods achieve the best disentanglement scores (DCI = 0.78 on dSprites), followed by VAE-based ($\beta$-VAE: DCI = 0.71) and GAN-based methods (DCI = 0.64). The authors conclude that auxiliary contrastive objectives---such as the MoCo loss we adopt---provide the strongest inductive bias for learning separable subspaces, particularly when the number of generative factors is unknown a priori.
+
+
+% ══════════════════════════════════════════════════════════════
+\section{Methodology}
+\label{sec:method}
+
+This chapter describes the data, preprocessing pipeline, formal hypotheses, machine-learning models, evaluation metrics, statistical tests, empirical results, and limitations of the study.
+
+\subsection{Dataset Overview}
+
+The project uses two primary data sources covering six US equities across three sectors (Table~\ref{tab:tickers}). The dataset spans from January~2019 to May~2025, providing over six years of daily observations that include several major market events (COVID-19 crash, 2021 meme-stock rally, 2022 Fed tightening cycle).
+
+\begin{table}[htbp]
+\centering
+\caption{Analysed tickers and descriptive statistics}
+\label{tab:tickers}
+\begin{tabular}{llrrrrrr}
+\toprule
+\textbf{Ticker} & \textbf{Sector} & \textbf{Price} & \textbf{News} & \textbf{Mean} & \textbf{Std} & \textbf{Mean} & \textbf{20d Vol} \\
+ & & \textbf{Records} & \textbf{Articles} & \textbf{Close (\$)} & \textbf{Close} & \textbf{Return} & \textbf{(daily)} \\
+\midrule
+AMD  & Tech    & 1{,}608 & 1{,}080 & 92.27  & 41.83 & +0.17\%  & 3.17\% \\
+INTC & Tech    & 1{,}608 & 1{,}182 & 39.71  & 10.81 & $-$0.01\% & 2.46\% \\
+PFE  & Pharma  & 1{,}607 &   447   & 31.78  &  6.54 & $-$0.01\% & 1.52\% \\
+JNJ  & Pharma  & 1{,}607 &   321   & 142.98 & 16.49 & +0.03\%  & 1.08\% \\
+BAC  & Banking & 1{,}607 &   430   & 31.92  &  7.13 & +0.07\%  & 1.87\% \\
+JPM  & Banking & 1{,}607 &   360   & 138.32 & 47.13 & +0.09\%  & 1.65\% \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Raw Data Format and Features}
+
+\subsubsection{Stock Price Data}
+
+The file \texttt{stock\_data.csv} contains 9{,}644 daily records with the following features:
+
+\begin{table}[htbp]
+\centering
+\caption{Stock data features}
+\label{tab:stock_features}
+\begin{tabular}{llp{8cm}}
+\toprule
+\textbf{Feature} & \textbf{Type} & \textbf{Description} \\
+\midrule
+Date          & datetime & Trading day (timezone-aware, US Eastern) \\
+Open          & float    & Opening price (adjusted for splits) \\
+High          & float    & Intraday high \\
+Low           & float    & Intraday low \\
+Close         & float    & Closing price (adjusted for splits) \\
+Volume        & int      & Number of shares traded \\
+Dividends     & float    & Cash dividend per share (0 on non-dividend days) \\
+Stock Splits  & float    & Split ratio (0 on non-split days) \\
+symbol        & string   & Ticker identifier \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{News Data}
+
+Six CSV files (\texttt{\{TICKER\}\_news.csv}) contain financial articles from Seeking Alpha:
+
+\begin{table}[htbp]
+\centering
+\caption{News data features}
+\label{tab:news_features}
+\begin{tabular}{llp{8cm}}
+\toprule
+\textbf{Feature} & \textbf{Type} & \textbf{Description} \\
+\midrule
+id      & int      & Unique article identifier \\
+date    & date     & Publication date \\
+title   & string   & Article headline (typically 5--15 words) \\
+summary & string   & Article summary/abstract (0--200 words; may be empty) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+News coverage varies significantly across tickers: technology stocks (AMD, INTC) receive 3--4$\times$ more coverage than pharmaceutical or banking stocks (Figure~\ref{fig:news_timeline}).
+
+
+\subsection{Exploratory Data Analysis}
+
+\subsubsection{Price Dynamics}
+
+Figure~\ref{fig:prices} shows the normalised close prices for all six tickers. AMD exhibits the highest growth (+800\% from 2019 to peak), while INTC and PFE show secular declines. JPM shows steady growth, reflecting the banking sector's recovery post-COVID.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/normalised_prices.png}
+\caption{Normalised close prices (base = 100 at January 2019).}
+\label{fig:prices}
+\end{figure}
+\FloatBarrier
+
+\subsubsection{Return Distributions}
+
+Figure~\ref{fig:returns} shows the daily return distributions. All tickers exhibit leptokurtic (fat-tailed) distributions, consistent with stylised facts of financial returns. AMD has the highest volatility ($\sigma = 3.37\%$), while JNJ has the lowest ($\sigma = 1.23\%$), reflecting the defensive nature of healthcare stocks.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/return_distributions.png}
+\caption{Daily return distributions by ticker, with mean ($\mu$) and standard deviation ($\sigma$).}
+\label{fig:returns}
+\end{figure}
+\FloatBarrier
+
+\subsubsection{Cross-Ticker Correlation}
+
+Figure~\ref{fig:cross_corr} presents the Pearson correlation matrix of daily returns. The matrix shows clear sectoral structure: intra-sector pairs have the strongest co-movement, with AMD--INTC at 0.57, BAC--JPM at 0.78, and PFE--JNJ at 0.42. Cross-sector correlations are lower but positive, typically in the 0.3--0.5 range, which is consistent with common market risk.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{figures/cross_ticker_correlation.png}
+\caption{Cross-ticker daily return correlation matrix.}
+\label{fig:cross_corr}
+\end{figure}
+\FloatBarrier
+
+\subsubsection{Feature Correlation (AMD)}
+
+Figure~\ref{fig:feat_corr} shows the Pearson correlation among OHLCV features and derived variables for AMD. OHLC prices are nearly perfectly correlated ($r > 0.99$), motivating the use of normalised features. Volume shows weak negative correlation with returns ($r = -0.05$), while 20-day volatility is weakly positively correlated with volume ($r = 0.16$).
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.65\textwidth]{figures/amd_feature_correlation.png}
+\caption{OHLCV feature correlation matrix for AMD.}
+\label{fig:feat_corr}
+\end{figure}
+\FloatBarrier
+
+\subsubsection{News Volume vs.\ Volatility}
+
+Figure~\ref{fig:news_vol} explores Hypothesis~\textbf{H4} by plotting monthly news volume against 20-day rolling volatility. Positive correlations are observed for most tickers, suggesting that increased media attention coincides with higher price uncertainty---motivating the model's reliability-aware fusion gate.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{figures/news_volume_vs_volatility.png}
+\caption{Monthly news volume vs.\ average 20-day volatility by ticker.}
+\label{fig:news_vol}
+\end{figure}
+\FloatBarrier
+
+\subsubsection{News Coverage Timeline}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{figures/news_coverage_timeline.png}
+\caption{Monthly news article count by ticker.}
+\label{fig:news_timeline}
+\end{figure}
+\FloatBarrier
+
+
+% ══════════════════════════════════════════════════════════════
+\subsection{Data Cleaning and Preprocessing}
+\label{sec:cleaning}
+
+\subsubsection{Stock Data Cleaning}
+
+Raw price timestamps include timezone offsets, for example \texttt{-05:00} for US Eastern time. They are parsed into UTC and then converted to clean date-level values so that price observations can be joined consistently with article dates. Since \texttt{stock\_data.csv} contains all six tickers in a single file, the observations are first filtered by the \texttt{symbol} column and then sorted chronologically within each ticker.
+
+Dividend and split columns are retained in the raw schema but are not used as model inputs, because the close prices are already adjusted for splits. No missing OHLCV observations were found. Derived features introduce missing values at the beginning of each ticker history because returns and rolling volatility require lagged observations; these initial rows are excluded from the training set.
+
+All OHLCV variables are z-score normalised separately for each ticker,
+\[
+    x_{\text{norm}} = \frac{x - \mu_x}{\sigma_x + \varepsilon}, \qquad \varepsilon = 10^{-8},
+\]
+which prevents the model from learning ticker-specific price scales. The two main derived quantities are the daily return and the 20-day realised volatility,
+\[
+    r_t = \frac{P_t}{P_{t-1}} - 1, \qquad
+    \sigma_{20,t}=\operatorname{std}(r_{t-19},\ldots,r_t).
+\]
+
+\subsubsection{News Data Cleaning}
+
+Article dates are parsed into \texttt{datetime} format and sorted chronologically. The textual input is constructed by concatenating the article title and summary,
+\[
+    \text{text}_i = \text{title}_i + \text{``. ''} + \text{summary}_i,
+\]
+while articles with missing summaries use the title alone. This keeps short but potentially informative headline-only records in the dataset instead of discarding them.
+
+The resulting texts are encoded with \textbf{FinBERT}, specifically the \texttt{finbert-tone} checkpoint by \texttt{yiyanghkust}. Tokenisation uses \texttt{BertTokenizer} with \texttt{max\_length=128}, padding, and truncation. Each article is represented by the 768-dimensional \texttt{[CLS]} embedding from the last hidden layer,
+\[
+    \mathbf{e}^{(i)}_{text} = \operatorname{FinBERT}_{CLS}(\text{text}_i) \in \mathbb{R}^{768}.
+\]
+FinBERT is used only in inference mode with frozen weights, and all embeddings are cached as \texttt{.npy} files for reproducibility and fast re-runs. No explicit clickbait or spam filtering is applied before modelling; instead, the Disentanglement Module in Section~\ref{sec:disentangle} is designed to route headline-like noise into the private text subspace.
+
+\subsubsection{Data Synchronisation}
+
+News articles are joined with stock data on an exact date match (inner join). For each matched record, the \textbf{next trading day's close price} is also attached to compute the target variable:
+\[
+    r_{t+1}^{\text{target}} = \frac{P_{t+1}}{P_t} - 1
+\]
+Records without a valid next-day price (last trading day, weekends bridging gaps) are excluded.
+
+\subsubsection{Temporal Windowing}
+
+For each news-day sample at time $t$, the OHLCV sliding window $\mathbf{X}_{t-W:t} \in \mathbb{R}^{W \times 5}$ is extracted, where $W = 20$ trading days ($\approx$1 calendar month). Samples with insufficient history ($t < W$) are excluded.
+
+\subsubsection{Train/Validation Split}
+
+The dataset is split \textbf{chronologically} (80\% train / 20\% validation) to prevent look-ahead bias. No random shuffling is applied to the split; the first 80\% of samples (by date order) constitute the training set.
+
+\subsection{Formal Research Hypotheses}
+
+After the data collection and cleaning steps, the following hypotheses are stated in null/alternative form. All decisions are made at the 95\% confidence level ($\alpha = 0.05$).
+
+\begin{table}[htbp]
+\centering
+\caption{Formal null and alternative hypotheses.}
+\label{tab:hypotheses_h0_h1}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lp{5.3cm}p{5.3cm}}
+\toprule
+\textbf{ID} & \textbf{$H_0$} & \textbf{$H_1$} \\
+\midrule
+H1 & Shared/private latent factors do not recover known content and noise factors in the synthetic experiment. & Shared/private latent factors positively recover known content and noise factors. \\
+H2 & The full DRL model does not reduce MSE relative to static fusion across tickers. & The full DRL model reduces MSE relative to static fusion across tickers. \\
+H3 & Lagged shared/content features do not add predictive $R^2$ over an AR(1) return proxy. & Lagged shared/content features add positive predictive $R^2$. \\
+H4 & Monthly news volume is not positively associated with realised volatility. & Monthly news volume is positively associated with realised volatility. \\
+H5 & SPY tweet intensity is not positively associated with absolute 5-minute price reaction. & SPY tweet intensity is positively associated with absolute 5-minute price reaction. \\
+H6 & Tweet-only features do not rank high-reaction SPY minutes better than random. & Tweet-only features rank high-reaction SPY minutes above random. \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ══════════════════════════════════════════════════════════════
+\subsection{ML Models}
+\label{sec:ml_models}
+
+This subsection describes the implemented machine-learning models and the full proposed architecture.
+
+\subsubsection{Architecture Overview}
+
+The model consists of five interconnected modules, illustrated in Figure~\ref{fig:arch}:
+
+\begin{figure}[htbp]
+\centering
+\begin{lstlisting}
+FinBERT [CLS] -> TextEncoder -> DisentanglementModule
+                                    | shared (content)
+                                    | private (noise)
+                                    v
+OHLCV window  -> TemporalEncoder -> DisentanglementModule
+                  (2-layer LSTM)    | shared (content)
+                                    | private (noise)
+                                    v
+               MoCo contrastive loss (shared_text <-> shared_price)
+                                    v
+               GatedFusionLayer  -> Prediction (next-day return)
+\end{lstlisting}
+\caption{Architecture of the Multimodal Causal Model.}
+\label{fig:arch}
+\end{figure}
+
+
+\subsubsection{Phase 1: Dual-Stream Disentangled Encoder}
+
+\paragraph{Text Encoder.}
+
+Pre-computed FinBERT embeddings $\mathbf{e}_\text{text} \in \mathbb{R}^{768}$ are passed through a trainable projection head:
+\[
+    \mathbf{h}_\text{text} = \text{GELU}(\text{LayerNorm}(W_1 \mathbf{e}_\text{text} + b_1))W_2 + b_2 \in \mathbb{R}^{d}
+\]
+where $d = 128$. FinBERT weights are frozen; only the projection head is trained.
+
+\paragraph{Temporal Encoder.}
+
+A 2-layer LSTM processes the OHLCV sliding window:
+\[
+    \mathbf{h}_\text{price} = \text{GELU}(\text{LayerNorm}(W_p \cdot \text{LSTM}(\mathbf{X}_{t-20:t})_{[-1]} + b_p)) \in \mathbb{R}^{d}
+\]
+where $\text{LSTM}(\cdot)_{[-1]}$ denotes the final hidden state of the top layer.
+
+\paragraph{Disentanglement Module.}
+\label{sec:disentangle}
+
+For each modality $m \in \{\text{text}, \text{price}\}$, the encoder output $\mathbf{h}_m$ is projected into two orthogonal subspaces:
+\begin{align}
+    \mathbf{s}_m &= \text{ReLU}(W_m^{(s)} \mathbf{h}_m + b_m^{(s)}) \in \mathbb{R}^{d_s} \quad \text{(shared / content)} \\
+    \mathbf{p}_m &= \text{ReLU}(W_m^{(p)} \mathbf{h}_m + b_m^{(p)}) \in \mathbb{R}^{d_s} \quad \text{(private / noise)}
+\end{align}
+where $d_s = 64$. Orthogonality is enforced via the \textbf{difference loss}:
+\[
+    \mathcal{L}_\text{diff} = \|S^\top P\|_F^2
+\]
+where $S, P \in \mathbb{R}^{B \times d_s}$ are batch matrices of shared and private vectors.
+
+\paragraph{Momentum Contrastive Learning (MoCo).}
+
+An InfoNCE-based contrastive loss aligns the shared subspaces of both modalities:
+\[
+    \mathcal{L}_\text{MoCo} = -\log \frac{\exp(q \cdot k^+ / \tau)}{\sum_{i=0}^{K} \exp(q \cdot k_i / \tau)}
+\]
+where $q = f_q(\mathbf{s}_\text{text})$, $k^+ = f_k(\mathbf{s}_\text{price})$ are the query/key projections, $\tau = 0.07$ is the temperature, and $K = 256$ is the momentum queue size. The key encoder is updated via exponential moving average with momentum $\mu = 0.999$.
+
+
+\subsubsection{Phase 2: Reliability-Aware Adaptive Fusion}
+
+The Gated Fusion Layer (inspired by AMFNet~[1]) estimates textual confidence:
+\[
+    g = \sigma\big(W_g [\mathbf{s}_\text{text} \| \mathbf{p}_\text{text}] + b_g\big) \in [0, 1]
+\]
+The fused representation:
+\[
+    \mathbf{z} = g \cdot \mathbf{s}_\text{text} + (1 - g) \cdot \mathbf{s}_\text{price}
+\]
+When the private (noise) component $\mathbf{p}_\text{text}$ is large, the gate $g$ learns to decrease, effectively down-weighting unreliable textual input.
+
+The final prediction is:
+\[
+    \hat{r}_{t+1} = \text{MLP}(\mathbf{z}) \in \mathbb{R}
+\]
+
+
+\subsubsection{Composite Loss}
+
+\[
+    \mathcal{L} = \underbrace{\text{MSE}(\hat{r}, r)}_{\text{prediction}} + \lambda_\text{diff} \cdot \underbrace{\mathcal{L}_\text{diff}}_{\text{orthogonality}} + \lambda_\text{MoCo} \cdot \underbrace{\mathcal{L}_\text{MoCo}}_{\text{contrastive}}
+\]
+The difference-loss weight is fixed at $\lambda_\text{diff} = 0.01$. The MoCo weight is treated as a regularisation hyperparameter: the prototype and SPY neural runs use $\lambda_\text{MoCo} = 0.01$, the six-ticker ablation uses the model default, and the synthetic stress test uses a slightly stronger contrastive weight to stabilise factor recovery.
+
+\subsection{Evaluation Metrics and Statistical Testing Protocol}
+
+Regression quality is evaluated using mean squared error and mean absolute error:
+\[
+    \text{MSE}=\frac{1}{n}\sum_{i=1}^{n}(\hat r_i-r_i)^2, \qquad
+    \text{MAE}=\frac{1}{n}\sum_{i=1}^{n}|\hat r_i-r_i|.
+\]
+Directional accuracy measures the fraction of observations for which the predicted and realised returns have the same sign:
+\[
+    \text{DirAcc}=\frac{1}{n}\sum_{i=1}^{n}\mathbb{1}[\operatorname{sign}(\hat r_i)=\operatorname{sign}(r_i)].
+\]
+The information coefficient is the Pearson correlation between predictions and realised returns:
+\[
+    IC=\operatorname{corr}(\hat r, r).
+\]
+For simple long/short diagnostics, the strategy return is $r_i^{strat}=\operatorname{sign}(\hat r_i)r_i$ and the annualised Sharpe proxy is:
+\[
+    S=\sqrt{252}\frac{\mathbb{E}[r^{strat}]}{\operatorname{std}(r^{strat})+10^{-12}}.
+\]
+For the SPY reaction-regime classifier, ROC AUC and average precision are used because the top-decile reaction target is imbalanced.
+
+Hypotheses are tested at the 95\% confidence level. Paired model comparisons use a one-sided paired $t$-test over ticker-level MSE differences:
+\[
+    t=\frac{\bar d}{s_d/\sqrt{m}}, \qquad d_j=\text{MSE}_{baseline,j}-\text{MSE}_{full,j},
+\]
+where $m$ is the number of tickers. Correlation hypotheses use Pearson or Spearman correlation tests depending on whether the statistic is cross-sectional/monthly or rank-based intraday. The SPY classifier AUC is tested using the Mann--Whitney statistic, since ROC AUC is equivalent to the probability that a randomly chosen positive example receives a higher score than a randomly chosen negative example. The resulting p-values and decisions are summarised in Table~\ref{tab:hypothesis_tests}.
+
+\begin{table}[htbp]
+\centering
+\caption{Hypothesis testing summary at the 95\% confidence level.}
+\label{tab:hypothesis_tests}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lp{4.2cm}rp{2.7cm}p{3.0cm}}
+\toprule
+\textbf{ID} & \textbf{Test statistic / effect} & \textbf{p-value} & \textbf{Decision} & \textbf{Interpretation} \\
+\midrule
+H1 & $r_{shared,C}=0.517$, $r_{private,N}=0.289$ & $<0.001$ & reject $H_0$ & synthetic separation supported \\
+H2 & mean MSE reduction $=0.000759$ & 0.146 & cannot reject $H_0$ & full DRL is competitive, not significantly better \\
+H3 & mean $\Delta R^2_{content}=0.0119$ & 0.048 & reject $H_0$ & content proxy adds lagged signal \\
+H4 & mean monthly Pearson $r=0.160$ & 0.012 & reject $H_0$ & news volume and volatility are positively linked \\
+H5 & Spearman $\rho=0.303$ & $<0.001$ & reject $H_0$ & SPY attention relates to reaction size \\
+H6 & tweet-only ROC AUC $=0.722$ & $<0.001$ & reject $H_0$ & tweets rank high-reaction minutes above random \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+% ══════════════════════════════════════════════════════════════
+% Addendum sections for the final coursework report.
+\subsection{Hypothesis Testing and Empirical Results}
+\label{sec:hypothesis_results}
+
+The proof-of-concept demonstrated that the proposed architecture can be trained end-to-end. For the final validation, the experimental design was extended in four directions: (i) baseline and ablation studies, (ii) latent content/noise diagnostics, (iii) a controlled synthetic experiment where the true generative factors are known, and (iv) a SPY 1-minute social information-flow study.
+
+\subsubsection{Baseline and Ablation Study}
+
+To evaluate whether the proposed disentangled multimodal architecture adds value beyond simpler alternatives, four models were compared on the same chronological train/validation split. The benchmark set contains two unimodal baselines, one simple multimodal fusion baseline, and the proposed full architecture. Formally, the comparison set is
+\[
+    \mathcal{M}=\{M_{price}, M_{text}, M_{static}, M_{DRL}\},
+\]
+where $M_{price}$ is a price-only LSTM over OHLCV windows, $M_{text}$ is a text-only MLP over cached FinBERT embeddings, $M_{static}$ concatenates text and price encodings without disentanglement or gating, and $M_{DRL}$ is the proposed shared/private, MoCo-regularised, gated-fusion model.
+
+The aggregate results are shown in Table~\ref{tab:baseline_ablation}. Across all six tickers, the full DRL model achieves the best mean MSE and MAE, the best mean directional accuracy, and the lowest MSE on four out of six tickers. Static fusion remains competitive and wins on INTC and JPM, which is useful evidence that the proposed architecture is not uniformly superior in every market regime. Its advantage is therefore framed not only as raw predictive performance, but as the combination of competitive prediction and interpretable content/noise decomposition.
+
+\begin{table}[htbp]
+\centering
+\caption{Aggregate baseline and ablation results across six tickers.}
+\label{tab:baseline_ablation}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Model} & \textbf{Mean MSE} & \textbf{Mean MAE} & \textbf{Mean Dir. Acc.} & \textbf{Mean IC} & \textbf{MSE Wins} \\
+\midrule
+price-only & 0.0038 & 0.0503 & 0.5207 & 0.0079 & 0 \\
+text-only & 0.0034 & 0.0459 & 0.4947 & 0.0274 & 0 \\
+static fusion & 0.0019 & 0.0363 & 0.5150 & -0.0056 & 2 \\
+full DRL & \textbf{0.0012} & \textbf{0.0266} & \textbf{0.5514} & -0.0333 & \textbf{4} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{results/baseline_metrics.png}
+\caption{Baseline comparison averaged over AMD and INTC.}
+\label{fig:baseline_metrics}
+\end{figure}
+
+\subsubsection{Latent Content/Noise Diagnostics}
+
+The main hypothesis of the project is not only that multimodal data improves prediction, but that the model can separate market-relevant information content from headline-driven noise. To test this, latent vectors were extracted from the trained AMD model. Each validation news event is represented by the diagnostic tuple
+\[
+    \mathbf{d}_i = \big(g_i,\; \|\mathbf{s}^{(i)}_{text}\|_2,\; \|\mathbf{p}^{(i)}_{text}\|_2,\; \hat r^{(i)}_{t+1},\; r^{(i)}_{t+1}\big),
+\]
+where $g_i$ is the text-confidence gate, $\|\mathbf{s}^{(i)}_{text}\|_2$ is the shared/content norm, $\|\mathbf{p}^{(i)}_{text}\|_2$ is the private/noise norm, and the last two terms are the predicted and realised next-day returns.
+
+Because formal causal identification is not possible with the current daily data and date-only news timestamps, a conservative lagged predictive proxy was used instead of a strict Granger-causality claim. The baseline autoregressive model uses only lagged return. Additional models add lagged content, noise, or gate features. The content feature improves the proxy on several tickers, most clearly AMD and BAC, while noise features are weaker on average but not uniformly uninformative (Table~\ref{tab:latent_proxy}). This is treated as suggestive temporal evidence rather than formal causal proof.
+
+\begin{table}[htbp]
+\centering
+\caption{Lagged predictive proxy for latent factors across tickers.}
+\label{tab:latent_proxy}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Ticker} & \textbf{AR(1) $R^2$} & \textbf{Content $R^2$} & \textbf{Noise $R^2$} & \textbf{$\Delta$ Content} & \textbf{$\Delta$ Noise} \\
+\midrule
+AMD & 0.0291 & 0.0517 & 0.0292 & +0.0226 & +0.0000 \\
+INTC & 0.0010 & 0.0026 & 0.0043 & +0.0015 & +0.0033 \\
+PFE & 0.0009 & 0.0040 & 0.0115 & +0.0031 & +0.0106 \\
+JNJ & 0.0044 & 0.0091 & 0.0082 & +0.0047 & +0.0038 \\
+BAC & 0.0613 & 0.0973 & 0.0682 & +0.0360 & +0.0069 \\
+JPM & 0.0160 & 0.0193 & 0.0284 & +0.0034 & +0.0124 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{results/gate_timeline_AMD.png}
+\caption{AMD text confidence gate and noise ratio over the validation period.}
+\label{fig:gate_timeline}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.75\textwidth]{results/content_noise_scatter_AMD.png}
+\caption{Content/noise decomposition of AMD validation news events.}
+\label{fig:content_noise_scatter}
+\end{figure}
+
+\subsubsection{Controlled Synthetic Validation}
+
+Real financial data does not provide ground-truth labels for whether a news article is true ``content'' or merely ``headline noise''. Therefore, a controlled simulation was added. The synthetic generator creates two latent factors: $c_t$, a content signal that affects future returns, and $n_t$, a headline-noise factor that affects text embeddings but has no direct effect on returns. The intended data-generating structure is
+\[
+    r_{t+1} = \beta_c c_t + \beta_m m_t + \varepsilon_t, \qquad
+    \mathbf{x}^{text}_t = A_c c_t + A_n n_t + \eta_t,
+\]
+where $m_t$ is a market factor, $\varepsilon_t$ and $\eta_t$ are noise terms, and only $c_t$ enters the return equation directly.
+
+The model is successful if predictions correlate with $c_t$ and not with $n_t$, and if the full DRL model's shared/private representations recover the intended distinction. Table~\ref{tab:synthetic_validation} shows that all predictive models primarily follow the true content factor rather than the noise factor. The full DRL model additionally produces non-trivial correlations between its shared representation and true content, and between its private representation and injected noise.
+
+\begin{table}[htbp]
+\centering
+\caption{Controlled synthetic validation with known content/noise factors.}
+\label{tab:synthetic_validation}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{lrrrrrr}
+\toprule
+\textbf{Model} & \textbf{MSE} & \textbf{Dir.} & \textbf{Pred--C} & \textbf{Pred--N} & \textbf{Shared--C} & \textbf{Private--N} \\
+\midrule
+price-only & 0.0005 & 0.8350 & 0.9819 & -0.0502 & -- & -- \\
+text-only & 0.0011 & 0.8217 & 0.8813 & -0.0360 & -- & -- \\
+static fusion & 0.0005 & 0.8467 & 0.9806 & -0.0285 & -- & -- \\
+full DRL & 0.0007 & 0.8300 & 0.9509 & -0.0653 & 0.5175 & 0.2888 \\
+\bottomrule
+\end{tabular}
+\vspace{2mm}
+
+\footnotesize C denotes the true content factor; N denotes the injected headline-noise factor.
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{results/synthetic_metrics.png}
+\caption{Synthetic content-vs-noise recovery experiment.}
+\label{fig:synthetic_metrics}
+\end{figure}
+
+\subsubsection{EventLens Demonstration}
+
+To make the model behaviour interpretable at the event level, a static HTML dashboard named \textit{EventLens} was generated for each ticker. For selected validation events, it displays the headline, local price window, prediction, realised return, text confidence gate, text/no-text counterfactual predictions, and content/noise decomposition. This artefact is not an additional model but a presentation layer over the latent diagnostics.
+
+The dashboard is available as:
+
+\begin{center}
+\texttt{results/event\_lens\_<TICKER>.html}
+\end{center}
+
+\subsubsection{SPY Intraday Social Information-Flow Study}
+
+In addition to the daily equity/news experiments, a separate SPY intraday study was added using a 1-minute dataset that combines OHLCV bars with tweet-level sentiment aggregates. This block does not replace corporate news with social media. Instead, it tests a related channel of the same research problem: whether social information flow and attention intensity help identify short-horizon market reactions. The raw tweet pool contains 3.26 million SPY-related tweets. After alignment to market bars, the minute-level dataset covers 236{,}928 one-minute bars from 23 March 2020 to 6 May 2021 and contains 1.18 million aligned tweets, of which approximately 499 thousand are labelled as bullish or bearish.
+
+The neural intraday experiment confirms that 5-minute directional prediction is extremely noisy: directional accuracy remains close to random for all models. Therefore, the more defensible intraday claim is not directional alpha, but an information-flow event-study result: minutes with unusually high tweet intensity are associated with larger absolute short-horizon price reactions and substantially higher trading volume.
+
+\begin{table}[htbp]
+\centering
+\caption{SPY intraday event-study: tweet intensity and market reaction.}
+\label{tab:spy_event_study}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Filter} & \textbf{Minutes} & \textbf{Mean $|r_{+5m}|$} & \textbf{Mean Volume} & \textbf{Up Share} \\
+\midrule
+tweet count $\geq$ 0  & 236{,}928 & 0.00062 & 780  & 0.495 \\
+tweet count $\geq$ 7  & 67{,}691  & 0.00097 & 1{,}752 & 0.507 \\
+tweet count $\geq$ 11 & 25{,}258  & 0.00128 & 2{,}537 & 0.502 \\
+tweet count $\geq$ 13 & 15{,}156  & 0.00142 & 2{,}953 & 0.500 \\
+tweet count $\geq$ 19 & 2{,}794   & 0.00174 & 4{,}253 & 0.504 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The highest-attention minutes therefore have approximately 2.8$\times$ larger absolute 5-minute reactions and 5.5$\times$ higher volume than the average minute, while the up/down share remains close to 50\%. This supports the project's broader thesis that information flow is strongly associated with market reaction intensity, even when it does not provide a simple directional trading signal.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{results/spy_event_study_buckets.png}
+\caption{SPY tweet-count buckets versus absolute 5-minute reaction and trading volume.}
+\label{fig:spy_event_buckets}
+\end{figure}
+
+To avoid overstating this as a causal jump, a second lead-lag check compares top 5\% tweet-attention events against matched lower-attention control minutes from the same intraday hour. The matched response curve shows that a substantial part of the reaction is regime-related rather than a clean post-tweet causal effect. This is an important negative result: tweet intensity is useful as an attention and reaction-risk indicator, but not sufficient for formal causal identification.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{results/spy_response_curve.png}
+\caption{Lead-lag response after SPY tweet-attention spikes versus matched controls.}
+\label{fig:spy_response_curve}
+\end{figure}
+
+A final classification experiment evaluates whether tweet features help identify top-decile 5-minute absolute reaction regimes. The target is not return direction, but whether the next 5-minute absolute return belongs to the most reactive 10\% of minutes. On the chronological validation split, tweet-only features achieve ROC AUC 0.722 and average precision 0.200, compared with a 7.0\% base positive rate. Price history remains the strongest standalone signal, while price+tweet fusion slightly improves average precision and precision among the top-ranked alerts.
+
+\begin{table}[htbp]
+\centering
+\caption{SPY top-decile 5-minute reaction classification.}
+\label{tab:spy_reaction_classifier}
+\small
+\setlength{\tabcolsep}{5pt}
+\begin{tabular}{lrrrr}
+\toprule
+\textbf{Feature set} & \textbf{ROC AUC} & \textbf{Avg. Prec.} & \textbf{F1} & \textbf{Prec.@10\%} \\
+\midrule
+price-only & 0.839 & 0.311 & 0.362 & 0.325 \\
+tweet-only & 0.722 & 0.200 & 0.223 & 0.226 \\
+price+tweet fusion & 0.837 & \textbf{0.316} & \textbf{0.369} & \textbf{0.330} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\textwidth]{results/spy_reaction_classifier.png}
+\caption{SPY reaction-regime classification: price-only, tweet-only, and fusion features.}
+\label{fig:spy_reaction_classifier}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.9\textwidth]{results/spy_top_event_windows.png}
+\caption{Top SPY tweet-attention minutes and local intraday price windows.}
+\label{fig:spy_event_windows}
+\end{figure}
+
+\subsection{Limitations and Future Work}
+
+The main equity/news implementation uses daily OHLCV data and date-level article timestamps. Therefore, it should be interpreted as a daily event-study model rather than a full high-frequency trading system. The SPY social information-flow study provides minute-level evidence for attention and reaction-risk effects, but it is based on tweet aggregates rather than timestamped corporate news or order-book events. Full HFT validation would require timestamped news and order-book data from sources such as LOBSTER, Bloomberg, Refinitiv, or Polygon.
+
+A second limitation is statistical power. The six-ticker daily experiment is sufficient for a coursework-scale validation, but ticker-level paired tests remain low-powered. This is visible in Hypothesis~H2: the full DRL model has the best average MSE and MAE, but its MSE reduction relative to static fusion is not statistically significant at the 95\% confidence level. For this reason, the final interpretation emphasises competitive predictive performance together with interpretability, rather than claiming unconditional superiority over all baselines.
+
+The SPY results should also be interpreted as reaction-risk evidence rather than a trading strategy. Tweet attention is strongly associated with larger absolute short-horizon reactions and improves high-reaction regime ranking, but directional prediction remains close to random. A deployable trading study would need transaction costs, slippage, execution latency, market-hours filtering, and a walk-forward validation protocol. These additions are deliberately left for future work because the present project focuses on information-flow modelling and interpretability rather than portfolio optimisation.
+
+Future work should add timestamped corporate news, order-book data, and SHAP-style post-hoc explanations to unify daily semantic modelling with intraday liquidity analysis.
+
+% ══════════════════════════════════════════════════════════════
+\section{Conclusion}
+\label{sec:conclusion}
+
+This coursework developed an interpretable multimodal framework for information-flow analysis. It models stock-price reactions using FinBERT text features, LSTM price encoders, shared/private disentanglement, contrastive alignment, and reliability-aware gated fusion.
+
+The empirical results support three main conclusions. First, multimodal modelling is useful: across six equities, the full DRL model achieves the best mean MSE and MAE and wins the MSE comparison on four out of six tickers. Second, interpretability matters: the latent diagnostics and EventLens dashboard show how the model decomposes individual news events into shared content, private noise, and text-confidence scores. Third, information flow is more strongly connected to reaction intensity than to simple directional alpha in intraday settings: the SPY 1-minute social attention study shows that tweet signals help identify high-reaction regimes, while up/down predictability remains close to random.
+
+The project therefore does not claim to solve high-frequency trading or establish formal causal identification. Instead, it provides a reproducible and interpretable daily event-study model, supported by ablation studies, controlled synthetic validation, latent predictive proxies, and a second intraday SPY social information-flow study. Future work should focus on timestamped news sources, order-book data, formal Granger/SHAP analysis, and more rigorous out-of-sample trading simulations with transaction costs.
+
+The main practical value of the work is the shift from a black-box prediction framing to an information-flow diagnostic framing. Even when directional predictability is weak, the model can still be useful by identifying when text-like signals are trusted, when they are treated as private noise, and when social attention corresponds to elevated reaction risk. This makes the proposed framework more suitable for empirical market analysis than for naive return forecasting alone.
+
+Overall, the final system should be read as a research prototype with a clear empirical message. Textual and social information does not mechanically predict the sign of the next return, especially at short horizons. However, it can still provide structured evidence about when the market is processing unusually intense information and when a multimodal model should rely more on semantic content or on price history. This distinction is the main contribution of the coursework: it separates predictive performance, interpretability, and reaction-risk analysis instead of reducing the entire task to one fragile trading metric.
+
+% ══════════════════════════════════════════════════════════════
+\section*{References}
+\addcontentsline{toc}{section}{References}
+
+\begin{enumerate}[label={[\arabic*]}]
+    \item K.~Bentaleb, M.~Ben~Houad, M.~Mestari. ``An Adaptive Modality Fusion Network for Stock Trend Prediction''. \textit{IEEE Access}, 2025. \texttt{doi:10.1109/ACCESS.2025.3645089}
+    \item Z.~Cao, H.~Geman. ``A Hype-Adjusted Probability Measure for NLP Stock Return Forecasting''. \textit{Frontiers in AI}, 8, 2025. \texttt{doi:10.3389/frai.2025.1527180}
+    \item Z.~Du, Y.~Wang, X.~Yang, S.~Im, Z.~Wang. ``MISA-GMC: An Enhanced Multimodal Sentiment Analysis Framework with Gated Fusion and Momentum Contrastive Modality Relationship Modeling''. \textit{Mathematics}, 14(1), 2026. \texttt{doi:10.3390/math14010115}
+    \item R.~Hashami, F.~Maldonado. ``Can News Predict the Direction of Oil Price Volatility? A Language Model Approach with SHAP Explanations''. \textit{arXiv preprint}, 2025. \url{https://arxiv.org/abs/2508.20707}
+    \item X.~Wang, H.~Chen, S.~Tang, Z.~Wu, W.~Zhu. ``Disentangled Representation Learning''. \textit{IEEE TPAMI}, 2024. \texttt{doi:10.1109/TPAMI.2024.3420937}
+    \item E.~F. Fama. ``Efficient Capital Markets: A Review of Theory and Empirical Work''. \textit{Journal of Finance}, 25(2), 1970.
+    \item C.~W. J. Granger. ``Investigating Causal Relations by Econometric Models and Cross-spectral Methods''. \textit{Econometrica}, 37(3), 1969.
+    \item P.~C. Tetlock. ``Giving Content to Investor Sentiment: The Role of Media in the Stock Market''. \textit{Journal of Finance}, 62(3), 2007.
+    \item T.~Loughran, B.~McDonald. ``When Is a Liability Not a Liability? Textual Analysis, Dictionaries, and 10-Ks''. \textit{Journal of Finance}, 66(1), 2011.
+    \item D.~Araci. ``FinBERT: Financial Sentiment Analysis with Pre-trained Language Models''. \textit{arXiv preprint arXiv:1908.10063}, 2019.
+    \item J.~Devlin, M.-W.~Chang, K.~Lee, K.~Toutanova. ``BERT: Pre-training of Deep Bidirectional Transformers for Language Understanding''. \textit{NAACL-HLT}, 2019.
+    \item S.~Hochreiter, J.~Schmidhuber. ``Long Short-Term Memory''. \textit{Neural Computation}, 9(8), 1997.
+    \item K.~He, H.~Fan, Y.~Wu, S.~Xie, R.~Girshick. ``Momentum Contrast for Unsupervised Visual Representation Learning''. \textit{CVPR}, 2020.
+    \item A.~Vaswani et al. ``Attention Is All You Need''. \textit{NeurIPS}, 2017.
+    \item Y.~Xu, S.~B. Cohen. ``Stock Movement Prediction from Tweets and Historical Prices''. \textit{ACL}, 2018.
+\end{enumerate}
+
+% ══════════════════════════════════════════════════════════════
+\clearpage
+\section*{LLM Documentation}
+\addcontentsline{toc}{section}{LLM Documentation}
+
+\textbf{Repository link:} \url{https://github.com/eeleexx/coursework_Y3_Kuzakhmetov}
+
+\vspace{0.5cm}
+
+This section documents the use of a large language model during the preparation of the coursework. The model was used as a research and engineering assistant: it helped refine the empirical scope, design validation experiments, and improve the structure and formatting of the final report. All numerical results, datasets, scripts, and final interpretations were checked against the local project files before inclusion in the report.
+
+\subsection*{Interaction 1: Research Scope and Scientific Validity}
+
+\textbf{Model:} OpenAI GPT-5 / Codex coding assistant.
+
+\textbf{Prompt:} The project currently mentions high-frequency trading, causal validation, SHAP, Granger causality, ablation studies, and multimodal modelling, but the implementation is closer to a prototype. Given a three-day deadline and limited access to historical intraday news data, what should be completed to make the coursework scientifically defensible?
+
+\textbf{LLM response summary:} The model recommended narrowing the claim from full high-frequency trading to an interpretable multimodal daily event-study. It proposed prioritising baseline models, directional and regression metrics, paired statistical tests, latent representation diagnostics, and a clear separation between predictive performance and causal interpretation. It also recommended avoiding unsupported HFT claims unless timestamped news or order-book data became available.
+
+\subsection*{Interaction 2: Experimental Design}
+
+\textbf{Model:} OpenAI GPT-5 / Codex coding assistant.
+
+\textbf{Prompt:} Design a validation plan for a coursework project that combines financial news, daily OHLCV data, FinBERT text embeddings, LSTM price encoders, shared/private disentangled representations, and gated multimodal fusion. The plan must be feasible with local data and should include baselines, statistical tests, and interpretability diagnostics.
+
+\textbf{LLM response summary:} The model proposed four main baselines: price-only LSTM, text-only neural predictor, static fusion, and the full DRL gated-fusion model. It suggested evaluating MSE, MAE, directional accuracy, information coefficient, and paired model comparisons. For interpretability, it suggested analysing shared/private latent factors, text-confidence gates, content/noise separation, counterfactual no-text predictions, and a controlled synthetic validation where the true content and noise factors are known.
+
+\subsection*{Interaction 3: Final Report and Reproducibility}
+
+\textbf{Model:} OpenAI GPT-5 / Codex coding assistant.
+
+\textbf{Prompt:} Convert the project from an intermediate CP1-style report into a complete final coursework submission. The report should avoid informal bullet lists, include formal hypotheses and formulas, describe limitations honestly, add figures and tables, and document how to reproduce the experiments.
+
+\textbf{LLM response summary:} The model helped restructure the report into a final submission with abstracts, literature review, methodology, preprocessing, hypotheses, model descriptions, evaluation protocol, empirical results, limitations, conclusion, references, and this LLM documentation section. It also assisted with LaTeX layout corrections, figure placement, and a reproducible project structure. The generated text was reviewed and edited to ensure that the report did not overstate causality, high-frequency trading capability, or statistical significance.
+
+\end{document}

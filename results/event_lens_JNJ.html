@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventLens · JNJ</title>
+  <style>
+    :root {
+      --ink: #16211f;
+      --muted: #64706d;
+      --paper: #f7f1e5;
+      --card: #fffaf0;
+      --green: #2a9d8f;
+      --orange: #e76f51;
+      --blue: #264653;
+      --line: rgba(22, 33, 31, .14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(231, 111, 81, .18), transparent 28rem),
+        radial-gradient(circle at 84% 4%, rgba(42, 157, 143, .18), transparent 24rem),
+        linear-gradient(135deg, #fbf7ed, var(--paper));
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 48px 22px 72px; }
+    header { display: grid; grid-template-columns: 1.4fr .9fr; gap: 28px; align-items: end; }
+    h1 { font-size: clamp(48px, 8vw, 110px); line-height: .9; margin: 0; letter-spacing: -0.06em; }
+    h2 { font-size: 30px; margin: 48px 0 18px; }
+    h3 { font-size: 22px; margin: 8px 0 10px; line-height: 1.12; }
+    p { color: var(--muted); line-height: 1.55; }
+    .hero-note {
+      border-left: 5px solid var(--orange);
+      padding-left: 18px;
+      font-size: 18px;
+    }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 34px 0; }
+    .kpi, .event-card, .panel {
+      background: rgba(255, 250, 240, .78);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 45px rgba(38, 70, 83, .08);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .kpi b { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    .kpi strong { display: block; font-size: 30px; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .event-meta { color: var(--orange); text-transform: uppercase; font-size: 12px; letter-spacing: .12em; font-weight: 700; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .chips span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: white; font-size: 13px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 16px; }
+    .metric-grid div { border-top: 1px solid var(--line); padding-top: 8px; }
+    .metric-grid b { display: block; color: var(--muted); font-size: 12px; }
+    .metric-grid strong { font-size: 19px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    .bar { display: block; height: 10px; background: rgba(38, 70, 83, .12); border-radius: 999px; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.42); border-radius: 18px; overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .image-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    img { width: 100%; border-radius: 20px; border: 1px solid var(--line); background: white; }
+    .sparkline { margin: 12px 0 14px; padding: 10px; background: rgba(255,255,255,.52); border-radius: 16px; border: 1px solid var(--line); }
+    .sparkline svg { width: 100%; height: 92px; display: block; }
+    .sparkline polyline { fill: none; stroke: var(--blue); stroke-width: 2.3; vector-effect: non-scaling-stroke; }
+    .sparkline .event-line { stroke: var(--orange); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+    .sparkline small { color: var(--muted); display: block; margin-top: 6px; }
+    @media (max-width: 860px) {
+      header, .grid, .kpis, .image-row { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="event-meta">Multimodal causal model demo</div>
+      <h1>EventLens<br>JNJ</h1>
+    </div>
+    <p class="hero-note">
+      Static dashboard for the Headline vs Content hypothesis. It shows where the model
+      treated news as market-relevant content and where it routed text into private noise.
+    </p>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><b>Validation events</b><strong>54</strong></div>
+    <div class="kpi"><b>Average text gate</b><strong>0.46</strong></div>
+    <div class="kpi"><b>Average noise ratio</b><strong>0.47</strong></div>
+    <div class="kpi"><b>Best MSE model</b><strong>full_drl</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline Comparison</h2>
+    <table>
+      <thead><tr><th>Model</th><th>MSE</th><th>MAE</th><th>Direction</th><th>IC</th></tr></thead>
+      <tbody><tr><td>price_only</td><td>0.006758</td><td>0.080945</td><td>0.667</td><td>-0.015</td></tr>
+<tr><td>text_only</td><td>0.003041</td><td>0.048946</td><td>0.407</td><td>+0.014</td></tr>
+<tr><td>static_fusion</td><td>0.003500</td><td>0.057473</td><td>0.667</td><td>-0.066</td></tr>
+<tr><td>full_drl</td><td>0.000377</td><td>0.014864</td><td>0.685</td><td>-0.049</td></tr></tbody>
+    </table>
+  </section>
+
+  <h2>Largest Market Reactions</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #1 · 2025-05-12</div>
+      <h3>Johnson &amp; Johnson: For Those Who Want Some Immunity Against Tariff Changes</h3>
+      <p>The U.S. and China have agreed to reduce tariffs temporarily for 90 days. I expect continued market volatility in the negotiation process. Johnson &amp; Johnson could offer some immunity due to the specific breakdown of the trade between these two countries and JNJ’s relatively minor exposure to China. Additionally, the dividend yield of 3.4%, is among the h</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="55.56" y1="6" x2="55.56" y2="74" class="event-line" />
+          <polyline points="0.00,24.80 5.56,21.99 11.11,19.98 16.67,29.28 22.22,20.93 27.78,26.56 33.33,29.23 38.89,15.00 44.44,23.24 50.00,30.48 55.56,30.89 61.11,59.54 66.67,70.00 72.22,53.66 77.78,45.01 83.33,39.18 88.89,33.30 94.44,35.71 100.00,38.58" />
+        </svg>
+        <small>2025-04-28 -&gt; 2025-05-22 · close 155.35 -> 152.61</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.25%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.70%</strong></div>
+        <div><b>No text</b><strong>+2.18%</strong></div>
+        <div><b>Text only</b><strong>+2.09%</strong></div>
+      </div>
+      <label>Content share 53.4%</label>
+      <span class='bar'><span style='width:53.4%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.6%</label>
+      <span class='bar'><span style='width:46.6%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #2 · 2025-01-07</div>
+      <h3>Johnson &amp; Johnson: I&#x27;m Saying Yes To This Mess</h3>
+      <p>JNJ&#x27;s long-term buy rating is based on its blue-chip pedigree, profitability, and diverse revenue lines, despite recent price stagnation and litigation risks. I emphasize adapting to market conditions, focusing on undervalued blue chips like JNJ, and using option strategies to manage risk and enhance returns. Technical analysis indicates JNJ has downsid</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,48.23 4.76,41.01 9.52,35.77 14.29,38.21 19.05,43.00 23.81,58.44 28.57,46.88 33.33,52.30 38.10,50.76 42.86,55.55 47.62,32.34 52.38,68.10 57.14,70.00 61.90,48.23 66.67,45.71 71.43,43.72 76.19,18.43 80.95,25.11 85.71,15.00 90.48,41.01 95.24,28.64 100.00,27.01" />
+        </svg>
+        <small>2024-12-20 -&gt; 2025-01-24 · close 143.32 -> 145.65</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.50%</strong></div>
+        <div><b>Actual T+1</b><strong>-2.71%</strong></div>
+        <div><b>No text</b><strong>+2.29%</strong></div>
+        <div><b>Text only</b><strong>+0.49%</strong></div>
+      </div>
+      <label>Content share 54.2%</label>
+      <span class='bar'><span style='width:54.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.8%</label>
+      <span class='bar'><span style='width:45.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #3 · 2025-01-07</div>
+      <h3>Johnson &amp; Johnson: A Potential Beneficiary Of A Great Rotation</h3>
+      <p>Johnson &amp; Johnson&#x27;s stagnant price and bond-like behavior make it an income investment, but a market shift could boost its appeal in 2025. Value stocks, including JNJ, may gain favor as growth stocks&#x27; earnings slow and proposed policies boost earnings in other sectors. JNJ&#x27;s 3.41% dividend yield and attractive forward PE ratio of 13.5 offe</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,48.23 4.76,41.01 9.52,35.77 14.29,38.21 19.05,43.00 23.81,58.44 28.57,46.88 33.33,52.30 38.10,50.76 42.86,55.55 47.62,32.34 52.38,68.10 57.14,70.00 61.90,48.23 66.67,45.71 71.43,43.72 76.19,18.43 80.95,25.11 85.71,15.00 90.48,41.01 95.24,28.64 100.00,27.01" />
+        </svg>
+        <small>2024-12-20 -&gt; 2025-01-24 · close 143.32 -> 145.65</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.01%</strong></div>
+        <div><b>Actual T+1</b><strong>-2.71%</strong></div>
+        <div><b>No text</b><strong>+2.29%</strong></div>
+        <div><b>Text only</b><strong>-1.32%</strong></div>
+      </div>
+      <label>Content share 53.5%</label>
+      <span class='bar'><span style='width:53.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.5%</label>
+      <span class='bar'><span style='width:46.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #4 · 2024-07-23</div>
+      <h3>4 Positives For Johnson &amp; Johnson</h3>
+      <p>Johnson &amp; Johnson might be the worst performing big pharma stock YTD, but there&#x27;s upside possible for it in the remainder of 2024. Revenue growth guidance was upgraded and even with a downgrade in EPS guidance, the number is still expected to see a YoY increase. Its market multiples indicate the possibility of some uptick, and there are dividends to</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,62.34 9.52,61.47 14.29,60.89 19.05,62.95 23.81,57.26 28.57,39.33 33.33,43.06 38.10,45.41 42.86,46.86 47.62,52.94 52.38,40.30 57.14,29.48 61.90,26.26 66.67,32.96 71.43,24.04 76.19,35.24 80.95,25.88 85.71,15.00 90.48,24.30 95.24,31.64 100.00,31.86" />
+        </svg>
+        <small>2024-07-09 -&gt; 2024-08-07 · close 143.63 -> 155.21</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.13%</strong></div>
+        <div><b>Actual T+1</b><strong>+2.58%</strong></div>
+        <div><b>No text</b><strong>+2.31%</strong></div>
+        <div><b>Text only</b><strong>-3.12%</strong></div>
+      </div>
+      <label>Content share 52.2%</label>
+      <span class='bar'><span style='width:52.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.8%</label>
+      <span class='bar'><span style='width:47.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #5 · 2025-02-18</div>
+      <h3>Johnson &amp; Johnson: Rich History Of Excellence Poised To Endure</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,64.68 9.52,60.74 14.29,64.61 19.05,65.90 23.81,62.22 28.57,56.01 33.33,58.87 38.10,52.33 42.86,55.95 47.62,55.68 52.38,46.08 57.14,40.16 61.90,31.48 66.67,26.72 71.43,18.94 76.19,28.90 80.95,26.75 85.71,22.48 90.48,15.00 95.24,21.16 100.00,22.15" />
+        </svg>
+        <small>2025-02-03 -&gt; 2025-03-05 · close 150.66 -> 165.12</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.68%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.87%</strong></div>
+        <div><b>No text</b><strong>+2.16%</strong></div>
+        <div><b>Text only</b><strong>+2.40%</strong></div>
+      </div>
+      <label>Content share 54.2%</label>
+      <span class='bar'><span style='width:54.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.8%</label>
+      <span class='bar'><span style='width:45.8%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #6 · 2024-05-23</div>
+      <h3>Johnson &amp; Johnson: Vital Signs Decent, A Compelling Value Case</h3>
+      <p>The Health Care sector has been stagnant while other areas of the stock market reach record highs, leaving some value opportunities in drugmakers and pharma stocks. I have a buy rating on Johnson &amp; Johnson (JNJ) given its stable earnings growth and lofty yield. JNJ&#x27;s diversified portfolio and pipeline provide stability, despite some weaknesses in ce</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,44.26 4.76,43.90 9.52,36.06 14.29,35.11 19.05,27.39 23.81,17.76 28.57,15.60 33.33,28.45 38.10,28.63 42.86,15.00 47.62,37.92 52.38,54.38 57.14,70.00 61.90,69.64 66.67,64.57 71.43,56.19 76.19,49.74 80.95,49.38 85.71,60.41 90.48,57.70 95.24,53.72 100.00,53.42" />
+        </svg>
+        <small>2024-05-09 -&gt; 2024-06-10 · close 145.19 -> 143.71</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.82%</strong></div>
+        <div><b>Actual T+1</b><strong>-1.82%</strong></div>
+        <div><b>No text</b><strong>+2.27%</strong></div>
+        <div><b>Text only</b><strong>-0.74%</strong></div>
+      </div>
+      <label>Content share 54.2%</label>
+      <span class='bar'><span style='width:54.2%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.8%</label>
+      <span class='bar'><span style='width:45.8%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Content-Like Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">content #1 · 2024-09-23</div>
+      <h3>Johnson &amp; Johnson: A Sell-Rated Dividend King</h3>
+      <p>Johnson &amp; Johnson (JNJ) is showing signs of a topping pattern with negative divergences in momentum indicators, suggesting potential price weakness ahead. The stock is expensive based on forward P/E and free cash flow yield, with poor growth prospects and negative earnings revisions. Despite favorable seasonality, JNJ may underperform in a risk-on market</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,20.39 4.76,15.00 9.52,32.94 14.29,34.20 19.05,28.03 23.81,17.73 28.57,17.17 33.33,23.62 38.10,32.94 42.86,37.56 47.62,44.15 52.38,47.23 57.14,62.50 61.90,56.97 66.67,56.90 71.43,52.27 76.19,52.76 80.95,58.51 85.71,63.20 90.48,64.68 95.24,70.00 100.00,68.88" />
+        </svg>
+        <small>2024-09-09 -&gt; 2024-10-08 · close 163.97 -> 157.16</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>-0.80%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.27%</strong></div>
+        <div><b>No text</b><strong>+2.07%</strong></div>
+        <div><b>Text only</b><strong>-6.14%</strong></div>
+      </div>
+      <label>Content share 54.5%</label>
+      <span class='bar'><span style='width:54.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.5%</label>
+      <span class='bar'><span style='width:45.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #2 · 2024-07-03</div>
+      <h3>Johnson &amp; Johnson: A Lot Of Moving Parts, But Perhaps Finally Lurching In The Right Direction</h3>
+      <p>Johnson &amp; Johnson shares have underperformed for years, with multiple contributing causes including upcoming generic competition for Stelara, uncertainty around talc litigation, and questions about internal growth capabilities. The pharmaceutical pipeline shows promise, and I like the &quot;&quot;franchise/platform&quot;&quot; approach in oncology, immun</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,69.16 4.76,58.60 9.52,53.80 14.29,51.96 19.05,61.53 23.81,63.36 28.57,68.41 33.33,66.63 38.10,65.24 42.86,67.27 47.62,68.96 52.38,65.04 57.14,70.00 61.90,62.22 66.67,50.43 71.43,49.09 76.19,48.20 80.95,51.37 85.71,42.60 90.48,15.00 95.24,20.75 100.00,24.36" />
+        </svg>
+        <small>2024-06-18 -&gt; 2024-07-19 · close 142.26 -> 151.09</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.66%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.54%</strong></div>
+        <div><b>No text</b><strong>+2.29%</strong></div>
+        <div><b>Text only</b><strong>-1.06%</strong></div>
+      </div>
+      <label>Content share 56.1%</label>
+      <span class='bar'><span style='width:56.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 43.9%</label>
+      <span class='bar'><span style='width:43.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #3 · 2024-07-17</div>
+      <h3>Johnson &amp; Johnson Q2: Robust New Product Pipeline</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.44</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,68.09 4.76,69.27 9.52,66.53 14.29,70.00 19.05,64.55 23.81,56.29 28.57,55.36 33.33,54.73 38.10,56.95 42.86,50.81 47.62,31.48 52.38,35.51 57.14,38.04 61.90,39.60 66.67,46.16 71.43,32.52 76.19,20.86 80.95,17.39 85.71,24.61 90.48,15.00 95.24,27.08 100.00,16.98" />
+        </svg>
+        <small>2024-07-02 -&gt; 2024-08-01 · close 142.63 -> 157.02</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.65%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.74%</strong></div>
+        <div><b>No text</b><strong>+2.32%</strong></div>
+        <div><b>Text only</b><strong>+1.79%</strong></div>
+      </div>
+      <label>Content share 55.8%</label>
+      <span class='bar'><span style='width:55.8%;background:#2a9d8f'></span></span>
+      <label>Noise share 44.2%</label>
+      <span class='bar'><span style='width:44.2%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #4 · 2024-07-11</div>
+      <h3>Johnson &amp; Johnson Q2 Earnings Preview: Scrutinizing Its Earnings Quality</h3>
+      <p>Johnson &amp; Johnson will announce its Q2 2024 results on Wednesday, July 17 before the market opens. In this update, I share what to expect from JNJ&#x27;s Q2 results and put previous results into perspective. In the main part of the article, I will take a close look at JNJ&#x27;s earnings adjustments, amid the significant deviation from GAAP earnings (+46</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.48</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,65.14 4.76,68.84 9.52,67.53 14.29,66.52 19.05,68.00 23.81,69.24 28.57,66.37 33.33,70.00 38.10,64.30 42.86,55.67 47.62,54.69 52.38,54.04 57.14,56.36 61.90,49.94 66.67,29.73 71.43,33.94 76.19,36.59 80.95,38.22 85.71,45.08 90.48,30.82 95.24,18.63 100.00,15.00" />
+        </svg>
+        <small>2024-06-26 -&gt; 2024-07-26 · close 143.41 -> 156.90</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.00%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.12%</strong></div>
+        <div><b>No text</b><strong>+2.33%</strong></div>
+        <div><b>Text only</b><strong>-2.08%</strong></div>
+      </div>
+      <label>Content share 53.5%</label>
+      <span class='bar'><span style='width:53.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.5%</label>
+      <span class='bar'><span style='width:46.5%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Noise-Heavy Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">noise #1 · 2024-04-04</div>
+      <h3>Johnson &amp; Johnson: Self-Proclaimed &#x27;Dividend King&#x27; Faces Tricky Outlook</h3>
+      <p>Johnson &amp; Johnson&#x27;s shares have experienced minimal growth over the past five years, in contrast to some of its competitors in the pharmaceutical industry. The company aims to focus on innovative medicine and medtech, projecting 5-7% growth between 2025 and 2030. Johnson &amp; Johnson faces challenges such as lawsuits and patent expirations, but its</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,24.73 4.76,24.77 9.52,26.85 14.29,26.89 19.05,24.69 23.81,15.92 28.57,15.00 33.33,16.64 38.10,16.84 42.86,30.73 47.62,37.78 52.38,38.22 57.14,41.42 61.90,38.62 66.67,46.98 71.43,52.63 76.19,57.71 80.95,57.43 85.71,70.00 90.48,68.72 95.24,64.84 100.00,56.15" />
+        </svg>
+        <small>2024-03-20 -&gt; 2024-04-19 · close 150.92 -> 143.31</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.53%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.07%</strong></div>
+        <div><b>No text</b><strong>+2.24%</strong></div>
+        <div><b>Text only</b><strong>-2.94%</strong></div>
+      </div>
+      <label>Content share 51.5%</label>
+      <span class='bar'><span style='width:51.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.5%</label>
+      <span class='bar'><span style='width:48.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #2 · 2024-03-28</div>
+      <h3>With Lawsuit And Medtech Tailwinds - Johnson &amp; Johnson May Be Back</h3>
+      <p>Johnson &amp; Johnson settles a consumer protection lawsuit for $75 million, a significant reduction from the initial demand of $6 billion. The company is facing nearly 60,000 lawsuits from ex-talc users claiming that the powder caused their cancer. A US District Judge is allowing the company to contest evidence linking its talc powder to cancer, providing a</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.48</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,19.85 9.52,26.53 14.29,29.11 19.05,31.23 23.81,31.28 28.57,33.73 33.33,33.77 38.10,31.18 42.86,20.88 47.62,19.80 52.38,21.73 57.14,21.96 61.90,38.29 66.67,46.57 71.43,47.09 76.19,50.85 80.95,47.56 85.71,57.39 90.48,64.02 95.24,70.00 100.00,69.67" />
+        </svg>
+        <small>2024-03-14 -&gt; 2024-04-15 · close 154.26 -> 143.00</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.33%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.26%</strong></div>
+        <div><b>No text</b><strong>+2.17%</strong></div>
+        <div><b>Text only</b><strong>-1.42%</strong></div>
+      </div>
+      <label>Content share 51.6%</label>
+      <span class='bar'><span style='width:51.6%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.4%</label>
+      <span class='bar'><span style='width:48.4%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #3 · 2024-09-13</div>
+      <h3>Johnson &amp; Johnson: A Strategic MedTech Shift For This Dividend King</h3>
+      <p>Ongoing lawsuits have presented the opportunity. It is up to the investor to decide just how much risk this adds to the thesis. Post Kenvue spin, the company is deciding to use cash to further diversify their MedTech offerings. The great thing about MedTech versus increasing investment in Medicines is that they don&#x27;t face the same &quot;&quot;patent cli</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,40.55 4.76,27.33 9.52,16.78 14.29,15.16 19.05,34.39 23.81,39.34 28.57,21.25 33.33,15.00 38.10,35.77 42.86,37.23 47.62,30.09 52.38,18.16 57.14,17.51 61.90,24.98 66.67,35.77 71.43,41.12 76.19,48.75 80.95,52.32 85.71,70.00 90.48,63.59 95.24,63.51 100.00,58.16" />
+        </svg>
+        <small>2024-08-29 -&gt; 2024-09-30 · close 161.63 -> 159.49</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.61%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.89%</strong></div>
+        <div><b>No text</b><strong>+2.05%</strong></div>
+        <div><b>Text only</b><strong>-2.51%</strong></div>
+      </div>
+      <label>Content share 52.0%</label>
+      <span class='bar'><span style='width:52.0%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.0%</label>
+      <span class='bar'><span style='width:48.0%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #4 · 2024-11-13</div>
+      <h3>Johnson &amp; Johnson: Tracking Well Above The Industry</h3>
+      <p>In the second half of 2024, Johnson &amp; Johnson made significant progress in developing its oncology franchise. So, Darzalex sales were $3.02 billion in the third quarter of 2024, up 20.7% year-on-year, thanks in part to its label expansions. Moreover, on November 8, 2024, the company announced the filing of regulatory applications to the FDA and EMA seeki</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,19.72 9.52,18.02 14.29,29.91 19.05,29.22 23.81,32.18 28.57,39.42 33.33,47.35 38.10,50.05 42.86,65.15 47.62,61.38 52.38,70.00 57.14,56.60 61.90,51.75 66.67,62.89 71.43,62.20 76.19,47.16 80.95,49.23 85.71,45.39 90.48,45.52 95.24,39.94 100.00,42.41" />
+        </svg>
+        <small>2024-10-30 -&gt; 2024-11-29 · close 158.07 -> 153.78</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+0.78%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.89%</strong></div>
+        <div><b>No text</b><strong>+2.23%</strong></div>
+        <div><b>Text only</b><strong>-1.71%</strong></div>
+      </div>
+      <label>Content share 52.1%</label>
+      <span class='bar'><span style='width:52.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.9%</label>
+      <span class='bar'><span style='width:47.9%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Diagnostics</h2>
+  <section class="image-row">
+    <img src="gate_timeline_JNJ.png" alt="Gate timeline">
+    <img src="content_noise_scatter_JNJ.png" alt="Content noise scatter">
+  </section>
+</main>
+</body>
+</html>

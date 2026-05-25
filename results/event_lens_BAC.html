@@ -1,0 +1,550 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>EventLens · BAC</title>
+  <style>
+    :root {
+      --ink: #16211f;
+      --muted: #64706d;
+      --paper: #f7f1e5;
+      --card: #fffaf0;
+      --green: #2a9d8f;
+      --orange: #e76f51;
+      --blue: #264653;
+      --line: rgba(22, 33, 31, .14);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      color: var(--ink);
+      background:
+        radial-gradient(circle at 12% 18%, rgba(231, 111, 81, .18), transparent 28rem),
+        radial-gradient(circle at 84% 4%, rgba(42, 157, 143, .18), transparent 24rem),
+        linear-gradient(135deg, #fbf7ed, var(--paper));
+    }
+    main { max-width: 1180px; margin: 0 auto; padding: 48px 22px 72px; }
+    header { display: grid; grid-template-columns: 1.4fr .9fr; gap: 28px; align-items: end; }
+    h1 { font-size: clamp(48px, 8vw, 110px); line-height: .9; margin: 0; letter-spacing: -0.06em; }
+    h2 { font-size: 30px; margin: 48px 0 18px; }
+    h3 { font-size: 22px; margin: 8px 0 10px; line-height: 1.12; }
+    p { color: var(--muted); line-height: 1.55; }
+    .hero-note {
+      border-left: 5px solid var(--orange);
+      padding-left: 18px;
+      font-size: 18px;
+    }
+    .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin: 34px 0; }
+    .kpi, .event-card, .panel {
+      background: rgba(255, 250, 240, .78);
+      border: 1px solid var(--line);
+      box-shadow: 0 18px 45px rgba(38, 70, 83, .08);
+      border-radius: 24px;
+      padding: 20px;
+      backdrop-filter: blur(8px);
+    }
+    .kpi b { display: block; color: var(--muted); font-size: 13px; text-transform: uppercase; letter-spacing: .08em; }
+    .kpi strong { display: block; font-size: 30px; margin-top: 8px; }
+    .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+    .event-meta { color: var(--orange); text-transform: uppercase; font-size: 12px; letter-spacing: .12em; font-weight: 700; }
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0 16px; }
+    .chips span { border: 1px solid var(--line); border-radius: 999px; padding: 6px 10px; background: white; font-size: 13px; }
+    .metric-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin: 12px 0 16px; }
+    .metric-grid div { border-top: 1px solid var(--line); padding-top: 8px; }
+    .metric-grid b { display: block; color: var(--muted); font-size: 12px; }
+    .metric-grid strong { font-size: 19px; }
+    label { display: block; font-size: 12px; color: var(--muted); margin: 10px 0 4px; }
+    .bar { display: block; height: 10px; background: rgba(38, 70, 83, .12); border-radius: 999px; overflow: hidden; }
+    .bar span { display: block; height: 100%; border-radius: 999px; }
+    table { width: 100%; border-collapse: collapse; background: rgba(255,255,255,.42); border-radius: 18px; overflow: hidden; }
+    th, td { padding: 12px 14px; border-bottom: 1px solid var(--line); text-align: left; }
+    th { color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .08em; }
+    .image-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    img { width: 100%; border-radius: 20px; border: 1px solid var(--line); background: white; }
+    .sparkline { margin: 12px 0 14px; padding: 10px; background: rgba(255,255,255,.52); border-radius: 16px; border: 1px solid var(--line); }
+    .sparkline svg { width: 100%; height: 92px; display: block; }
+    .sparkline polyline { fill: none; stroke: var(--blue); stroke-width: 2.3; vector-effect: non-scaling-stroke; }
+    .sparkline .event-line { stroke: var(--orange); stroke-width: 1.5; stroke-dasharray: 4 3; vector-effect: non-scaling-stroke; }
+    .sparkline small { color: var(--muted); display: block; margin-top: 6px; }
+    @media (max-width: 860px) {
+      header, .grid, .kpis, .image-row { grid-template-columns: 1fr; }
+      .metric-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <div>
+      <div class="event-meta">Multimodal causal model demo</div>
+      <h1>EventLens<br>BAC</h1>
+    </div>
+    <p class="hero-note">
+      Static dashboard for the Headline vs Content hypothesis. It shows where the model
+      treated news as market-relevant content and where it routed text into private noise.
+    </p>
+  </header>
+
+  <section class="kpis">
+    <div class="kpi"><b>Validation events</b><strong>67</strong></div>
+    <div class="kpi"><b>Average text gate</b><strong>0.45</strong></div>
+    <div class="kpi"><b>Average noise ratio</b><strong>0.47</strong></div>
+    <div class="kpi"><b>Best MSE model</b><strong>full_drl</strong></div>
+  </section>
+
+  <section class="panel">
+    <h2>Baseline Comparison</h2>
+    <table>
+      <thead><tr><th>Model</th><th>MSE</th><th>MAE</th><th>Direction</th><th>IC</th></tr></thead>
+      <tbody><tr><td>price_only</td><td>0.002806</td><td>0.048999</td><td>0.463</td><td>+0.071</td></tr>
+<tr><td>text_only</td><td>0.003224</td><td>0.050050</td><td>0.522</td><td>-0.028</td></tr>
+<tr><td>static_fusion</td><td>0.002782</td><td>0.047229</td><td>0.448</td><td>-0.135</td></tr>
+<tr><td>full_drl</td><td>0.001589</td><td>0.035490</td><td>0.507</td><td>-0.065</td></tr></tbody>
+    </table>
+  </section>
+
+  <h2>Largest Market Reactions</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #1 · 2025-04-03</div>
+      <h3>Bank of America: Series L Preferred Shares A Hold After Recent Outperformance</h3>
+      <p>Bank of America only derived 55% of its 2024 revenues from net interest income, making it less dependent on Fed rate cuts compared to smaller peers. The bank&#x27;s baseline outlook for 2025 is already quite conservative, indicating no substantial provision build is to be expected when it reports Q1 2025 results. I present three valuation scenarios for the c</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,19.95 4.76,20.01 9.52,16.30 14.29,15.00 19.05,17.85 23.81,19.45 28.57,27.56 33.33,24.59 38.10,26.07 42.86,23.85 47.62,52.49 52.38,70.00 57.14,62.64 61.90,66.04 66.67,52.92 71.43,60.97 76.19,60.35 80.95,55.89 85.71,47.73 90.48,51.81 95.24,51.32 100.00,54.35" />
+        </svg>
+        <small>2025-03-20 -&gt; 2025-04-21 · close 42.48 -> 36.92</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.89%</strong></div>
+        <div><b>Actual T+1</b><strong>-7.60%</strong></div>
+        <div><b>No text</b><strong>+4.83%</strong></div>
+        <div><b>Text only</b><strong>-2.46%</strong></div>
+      </div>
+      <label>Content share 51.7%</label>
+      <span class='bar'><span style='width:51.7%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.3%</label>
+      <span class='bar'><span style='width:48.3%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #2 · 2025-02-27</div>
+      <h3>Bank of America: Share Price Pressure Is Good News For Long-Term Shareholders</h3>
+      <p>Recent strong performance of Bank of America&#x27;s share price brought valuation more in line with current business fundamentals. While BAC is closer to fair value at the moment, shareholder returns in 2025 are likely to come under pressure. Excess cash will continue to weigh on returns, but ultimately this is good news for long-term shareholders.</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,20.81 4.76,19.88 9.52,15.00 14.29,18.33 19.05,22.36 23.81,27.86 28.57,31.65 33.33,34.37 38.10,38.39 42.86,38.39 47.62,37.00 52.38,21.66 57.14,25.85 61.90,48.23 66.67,51.18 71.43,57.61 76.19,56.05 80.95,68.29 85.71,70.00 90.48,67.66 95.24,69.53 100.00,60.02" />
+        </svg>
+        <small>2025-02-12 -&gt; 2025-03-14 · close 45.92 -> 40.89</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.46%</strong></div>
+        <div><b>Actual T+1</b><strong>+4.49%</strong></div>
+        <div><b>No text</b><strong>+4.52%</strong></div>
+        <div><b>Text only</b><strong>-3.57%</strong></div>
+      </div>
+      <label>Content share 51.8%</label>
+      <span class='bar'><span style='width:51.8%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.2%</label>
+      <span class='bar'><span style='width:48.2%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #3 · 2025-02-27</div>
+      <h3>Bank of America: The Dip Gives A Nice Opportunity</h3>
+      <p>I reiterate my &quot;&quot;Buy&quot;&quot; rating for Bank of America, expecting growth in 2025 due to favorable market conditions and reduced regulation. BAC&#x27;s strong financials, particularly in Consumer Banking and Global Wealth Management, support its potential for continued growth and margin enhancement. Reduced regulatory pressure under Trump&#x27;</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.44</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,20.81 4.76,19.88 9.52,15.00 14.29,18.33 19.05,22.36 23.81,27.86 28.57,31.65 33.33,34.37 38.10,38.39 42.86,38.39 47.62,37.00 52.38,21.66 57.14,25.85 61.90,48.23 66.67,51.18 71.43,57.61 76.19,56.05 80.95,68.29 85.71,70.00 90.48,67.66 95.24,69.53 100.00,60.02" />
+        </svg>
+        <small>2025-02-12 -&gt; 2025-03-14 · close 45.92 -> 40.89</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.72%</strong></div>
+        <div><b>Actual T+1</b><strong>+4.49%</strong></div>
+        <div><b>No text</b><strong>+4.52%</strong></div>
+        <div><b>Text only</b><strong>-2.33%</strong></div>
+      </div>
+      <label>Content share 52.9%</label>
+      <span class='bar'><span style='width:52.9%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.1%</label>
+      <span class='bar'><span style='width:47.1%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #4 · 2025-04-21</div>
+      <h3>Bank of America: I Was Wrong (Rating Downgrade)</h3>
+      <p>Bank of America Corporation has shown impressive earnings growth, with net income at $7.4 billion and EPS at $0.90, indicating strength in long-term trends. Despite strong financial performance, the stock has declined nearly 18%, prompting a downgrade to a &quot;&quot;buy&quot;&quot; rating due to potential sector underperformance. Comparative valuations sho</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.45</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,60.27 9.52,64.77 14.29,47.44 19.05,58.07 23.81,57.25 28.57,51.37 33.33,40.58 38.10,45.97 42.86,45.32 47.62,49.32 52.38,37.88 57.14,34.37 61.90,27.59 66.67,26.69 71.43,25.95 76.19,24.23 80.95,25.13 85.71,22.76 90.48,15.41 95.24,15.00 100.00,17.29" />
+        </svg>
+        <small>2025-04-04 -&gt; 2025-05-06 · close 34.39 -> 40.84</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.18%</strong></div>
+        <div><b>Actual T+1</b><strong>+3.79%</strong></div>
+        <div><b>No text</b><strong>+4.98%</strong></div>
+        <div><b>Text only</b><strong>-1.92%</strong></div>
+      </div>
+      <label>Content share 53.5%</label>
+      <span class='bar'><span style='width:53.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.5%</label>
+      <span class='bar'><span style='width:46.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #5 · 2025-04-21</div>
+      <h3>Bank of America: Poised For A Rebound</h3>
+      <p>nan</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>close</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,60.27 9.52,64.77 14.29,47.44 19.05,58.07 23.81,57.25 28.57,51.37 33.33,40.58 38.10,45.97 42.86,45.32 47.62,49.32 52.38,37.88 57.14,34.37 61.90,27.59 66.67,26.69 71.43,25.95 76.19,24.23 80.95,25.13 85.71,22.76 90.48,15.41 95.24,15.00 100.00,17.29" />
+        </svg>
+        <small>2025-04-04 -&gt; 2025-05-06 · close 34.39 -> 40.84</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.62%</strong></div>
+        <div><b>Actual T+1</b><strong>+3.79%</strong></div>
+        <div><b>No text</b><strong>+4.98%</strong></div>
+        <div><b>Text only</b><strong>+3.19%</strong></div>
+      </div>
+      <label>Content share 53.5%</label>
+      <span class='bar'><span style='width:53.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.5%</label>
+      <span class='bar'><span style='width:46.5%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">reaction #6 · 2025-04-09</div>
+      <h3>Bank of America Q1 Earnings Preview: Guidance And The Macro Don&#x27;t Align</h3>
+      <p>Bank of America Corporation faces economic uncertainty, with Q1 2025 earnings expected to be impacted by macro pressures and a shift in market sentiment. Despite strong Q4 2024 results, BAC&#x27;s stock has dropped significantly, underperforming peers like JPMorgan and Wells Fargo, raising concerns about its resilience. Management&#x27;s optimistic NII guida</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,16.70 9.52,25.24 14.29,22.11 19.05,23.68 23.81,21.33 28.57,51.54 33.33,70.00 38.10,62.24 42.86,65.82 47.62,51.99 52.38,60.47 57.14,59.82 61.90,55.12 66.67,46.51 71.43,50.82 76.19,50.30 80.95,53.49 85.71,44.36 90.48,41.55 95.24,36.14 100.00,35.42" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 42.82 -> 39.69</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.93%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.50%</strong></div>
+        <div><b>No text</b><strong>+4.95%</strong></div>
+        <div><b>Text only</b><strong>-5.87%</strong></div>
+      </div>
+      <label>Content share 52.9%</label>
+      <span class='bar'><span style='width:52.9%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.1%</label>
+      <span class='bar'><span style='width:47.1%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Content-Like Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">content #1 · 2024-06-06</div>
+      <h3>Bank of America Hasn&#x27;t Run Out Of Steam Yet</h3>
+      <p>Bank of America&#x27;s stock has outperformed the S&amp;P 500 with a 39% total return since July 2023. The stock currently trades at 1.2x price to book, a relative bargain compared to long term historical price to book valuations. The latest concern about consumer credit card debt may be overblown, as charge off rates are moving in the right direction.</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,31.95 4.76,51.82 9.52,33.97 14.29,46.77 19.05,66.97 23.81,70.00 28.57,24.21 33.33,27.91 38.10,34.64 42.86,25.22 47.62,33.97 52.38,23.13 57.14,26.86 61.90,54.30 66.67,35.66 71.43,40.75 76.19,41.42 80.95,32.28 85.71,16.02 90.48,16.02 95.24,32.95 100.00,15.00" />
+        </svg>
+        <small>2024-05-22 -&gt; 2024-06-24 · close 38.80 -> 39.29</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.20%</strong></div>
+        <div><b>Actual T+1</b><strong>+0.81%</strong></div>
+        <div><b>No text</b><strong>+5.09%</strong></div>
+        <div><b>Text only</b><strong>-5.02%</strong></div>
+      </div>
+      <label>Content share 54.0%</label>
+      <span class='bar'><span style='width:54.0%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.0%</label>
+      <span class='bar'><span style='width:46.0%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #2 · 2024-09-03</div>
+      <h3>10 Reasons That Likely Motivated Buffett To Sell Bank of America Stock</h3>
+      <p>Warren Buffett is selling Bank of America shares, likely due to a potential recession, high valuation, and weakening consumer financial health. Bank of America faces headwinds like increasing credit losses, leverage risks, and lackluster loan growth, making it less attractive. The bank&#x27;s competitive moat is weakening as digital banking rises, and its va</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,43.83 4.76,70.00 9.52,68.40 14.29,55.32 19.05,41.17 23.81,37.16 28.57,43.83 33.33,36.36 38.10,30.49 42.86,15.00 47.62,16.33 52.38,21.67 57.14,31.29 61.90,61.38 66.67,42.30 71.43,47.41 76.19,54.93 80.95,60.85 85.71,64.34 90.48,52.25 95.24,40.15 100.00,38.27" />
+        </svg>
+        <small>2024-08-19 -&gt; 2024-09-18 · close 38.95 -> 39.15</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.81%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.49%</strong></div>
+        <div><b>No text</b><strong>+5.01%</strong></div>
+        <div><b>Text only</b><strong>-3.49%</strong></div>
+      </div>
+      <label>Content share 54.1%</label>
+      <span class='bar'><span style='width:54.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 45.9%</label>
+      <span class='bar'><span style='width:45.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #3 · 2025-03-25</div>
+      <h3>Bank of America: Weak Stock Performance As A Warning</h3>
+      <p>Bank of America holds substantial exposure to consumer and small business loans, with Warren Buffett selling shares in 2024. A potential recession in 2025, driven by Trump’s stagflation policies and a Wall Street pullback in wealth, could push shares significantly lower. Technical momentum analysis reveals ultra-weak performance, particularly from OBV and EM</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,37.71 4.76,35.85 9.52,37.33 14.29,29.79 19.05,26.38 23.81,25.08 28.57,21.62 33.33,19.95 38.10,20.01 42.86,16.30 47.62,15.00 52.38,17.85 57.14,19.45 61.90,27.56 66.67,24.59 71.43,26.07 76.19,23.85 80.95,52.49 85.71,70.00 90.48,62.64 95.24,66.04 100.00,52.92" />
+        </svg>
+        <small>2025-03-11 -&gt; 2025-04-09 · close 39.61 -> 37.15</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+2.26%</strong></div>
+        <div><b>Actual T+1</b><strong>-1.06%</strong></div>
+        <div><b>No text</b><strong>+4.71%</strong></div>
+        <div><b>Text only</b><strong>-5.04%</strong></div>
+      </div>
+      <label>Content share 53.1%</label>
+      <span class='bar'><span style='width:53.1%;background:#2a9d8f'></span></span>
+      <label>Noise share 46.9%</label>
+      <span class='bar'><span style='width:46.9%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">content #4 · 2025-04-09</div>
+      <h3>Bank of America Q1 Earnings Preview: Guidance And The Macro Don&#x27;t Align</h3>
+      <p>Bank of America Corporation faces economic uncertainty, with Q1 2025 earnings expected to be impacted by macro pressures and a shift in market sentiment. Despite strong Q4 2024 results, BAC&#x27;s stock has dropped significantly, underperforming peers like JPMorgan and Wells Fargo, raising concerns about its resilience. Management&#x27;s optimistic NII guida</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,15.00 4.76,16.70 9.52,25.24 14.29,22.11 19.05,23.68 23.81,21.33 28.57,51.54 33.33,70.00 38.10,62.24 42.86,65.82 47.62,51.99 52.38,60.47 57.14,59.82 61.90,55.12 66.67,46.51 71.43,50.82 76.19,50.30 80.95,53.49 85.71,44.36 90.48,41.55 95.24,36.14 100.00,35.42" />
+        </svg>
+        <small>2025-03-26 -&gt; 2025-04-25 · close 42.82 -> 39.69</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+1.93%</strong></div>
+        <div><b>Actual T+1</b><strong>-3.50%</strong></div>
+        <div><b>No text</b><strong>+4.95%</strong></div>
+        <div><b>Text only</b><strong>-5.87%</strong></div>
+      </div>
+      <label>Content share 52.9%</label>
+      <span class='bar'><span style='width:52.9%;background:#2a9d8f'></span></span>
+      <label>Noise share 47.1%</label>
+      <span class='bar'><span style='width:47.1%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Most Noise-Heavy Headlines</h2>
+  <section class="grid">
+    
+    <article class="event-card">
+      <div class="event-meta">noise #1 · 2024-02-02</div>
+      <h3>Bank of America: In Worse Shape Than Before?</h3>
+      <p>Bank of America has reduced its consumer credit card exposure. However, Bank of America has significantly increased its exposure to commercial lending. It&#x27;s time you do appropriate due diligence on banks that are housing your hard-earned money.</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.47</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,70.00 4.76,62.94 9.52,58.23 14.29,53.74 19.05,44.96 23.81,44.11 28.57,40.25 33.33,15.00 38.10,31.69 42.86,41.54 47.62,43.25 52.38,53.52 57.14,52.45 61.90,49.46 66.67,50.74 71.43,51.81 76.19,40.04 80.95,58.66 85.71,50.53 90.48,30.41 95.24,29.98 100.00,32.76" />
+        </svg>
+        <small>2024-01-19 -&gt; 2024-02-20 · close 31.22 -> 32.91</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.95%</strong></div>
+        <div><b>Actual T+1</b><strong>-1.43%</strong></div>
+        <div><b>No text</b><strong>+5.60%</strong></div>
+        <div><b>Text only</b><strong>+0.54%</strong></div>
+      </div>
+      <label>Content share 50.6%</label>
+      <span class='bar'><span style='width:50.6%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.4%</label>
+      <span class='bar'><span style='width:49.4%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #2 · 2024-10-25</div>
+      <h3>JPMorgan, Bank of America, Citi Earnings Summaries: Playing Offense And Defense With 3 Bank Stocks</h3>
+      <p>JPMorgan reported a strong quarter again with revenue growing 6% y-o-y, versus the 1% EPS growth, although the 3rd quarter of &#x27;24 was a tough compare versus Q3 ’23, when net interest income and better credit metrics drove 29% y-o-y revenue growth and 36% EPS growth. Bank of America reported 1% y-o-y net revenue growth which generated -10% EPS growth, wh</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.43</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,62.82 4.76,63.28 9.52,60.62 14.29,52.98 19.05,55.29 23.81,58.54 28.57,65.02 33.33,58.77 38.10,58.31 42.86,54.72 47.62,63.52 52.38,55.06 57.14,56.11 61.90,58.65 66.67,64.33 71.43,65.02 76.19,70.00 80.95,63.63 85.71,22.76 90.48,30.17 95.24,26.00 100.00,15.00" />
+        </svg>
+        <small>2024-10-11 -&gt; 2024-11-11 · close 41.46 -> 45.54</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.05%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.74%</strong></div>
+        <div><b>No text</b><strong>+4.79%</strong></div>
+        <div><b>Text only</b><strong>-2.83%</strong></div>
+      </div>
+      <label>Content share 50.9%</label>
+      <span class='bar'><span style='width:50.9%;background:#2a9d8f'></span></span>
+      <label>Noise share 49.1%</label>
+      <span class='bar'><span style='width:49.1%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #3 · 2024-09-24</div>
+      <h3>Bank of America: Lackluster, Headwinds Forming A Bearish Setup (Technical Analysis)</h3>
+      <p>Lyn Alden and Avi Gilburt provide fundamental insights, highlighting Bank of America Corporation&#x27;s exposure to long-duration underwater mortgages and its medium valuation. Our composite methodology is emphasized for its ability to provide market context, with a bearish setup for Bank of America suggested by recent price structures and fundamentals. Our </p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>missed direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,54.39 4.76,61.33 9.52,66.78 14.29,70.00 19.05,58.85 23.81,47.70 28.57,45.97 33.33,15.00 38.10,29.86 42.86,39.77 47.62,50.18 52.38,55.14 57.14,48.45 61.90,51.42 66.67,44.48 71.43,55.88 76.19,55.63 80.95,55.14 85.71,33.83 90.48,37.54 95.24,38.29 100.00,31.85" />
+        </svg>
+        <small>2024-09-10 -&gt; 2024-10-09 · close 38.82 -> 39.72</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+3.55%</strong></div>
+        <div><b>Actual T+1</b><strong>-0.51%</strong></div>
+        <div><b>No text</b><strong>+4.93%</strong></div>
+        <div><b>Text only</b><strong>-2.98%</strong></div>
+      </div>
+      <label>Content share 51.3%</label>
+      <span class='bar'><span style='width:51.3%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.7%</label>
+      <span class='bar'><span style='width:48.7%;background:#e76f51'></span></span>
+    </article>
+    
+    <article class="event-card">
+      <div class="event-meta">noise #4 · 2024-04-17</div>
+      <h3>Bank of America: Keep Your Focus On The Total Picture</h3>
+      <p>Bank of America Corporation stock price responded to worries rather than the earnings announcement itself because the market looks forward. The company is far too diversified for &quot;&quot;office&quot;&quot; and credit card worries (for example) to dominate. The spread between cash costs and investment returns for the bank is widening. There is a Bank of A</p>
+      <div class="chips">
+        <span>price-dominant</span>
+        <span>right direction</span>
+        <span>gate 0.46</span>
+      </div>
+      
+      <div class="sparkline">
+        <svg viewBox="0 0 100 78" preserveAspectRatio="none" role="img">
+          <line x1="47.62" y1="6" x2="47.62" y2="74" class="event-line" />
+          <polyline points="0.00,28.86 4.76,36.61 9.52,33.78 14.29,27.97 19.05,24.54 23.81,40.64 28.57,45.11 33.33,53.46 38.10,51.07 42.86,70.00 47.62,61.80 52.38,53.75 57.14,35.87 61.90,24.54 66.67,15.00 71.43,15.75 76.19,21.86 80.95,23.05 85.71,27.22 90.48,35.27 95.24,36.17 100.00,37.21" />
+        </svg>
+        <small>2024-04-03 -&gt; 2024-05-02 · close 36.54 -> 35.99</small>
+      </div>
+    
+      <div class="metric-grid">
+        <div><b>Predicted</b><strong>+4.79%</strong></div>
+        <div><b>Actual T+1</b><strong>+1.53%</strong></div>
+        <div><b>No text</b><strong>+5.39%</strong></div>
+        <div><b>Text only</b><strong>-0.05%</strong></div>
+      </div>
+      <label>Content share 51.5%</label>
+      <span class='bar'><span style='width:51.5%;background:#2a9d8f'></span></span>
+      <label>Noise share 48.5%</label>
+      <span class='bar'><span style='width:48.5%;background:#e76f51'></span></span>
+    </article>
+    
+  </section>
+
+  <h2>Diagnostics</h2>
+  <section class="image-row">
+    <img src="gate_timeline_BAC.png" alt="Gate timeline">
+    <img src="content_noise_scatter_BAC.png" alt="Content noise scatter">
+  </section>
+</main>
+</body>
+</html>
